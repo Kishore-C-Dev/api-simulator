@@ -1,0 +1,25 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build outputs
+target/
+build/
+*.jar
+*.war
+
+# Environment
+.env
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Node modules (if any)
+node_modules/

@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: api-simulator-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - simulator-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: api-simulator-backend
+    ports:
+      - "8080:8080"
+      - "9999:9999"  # WireMock port
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/simulator
+      - ACTIVE_DATASET=default
+      - SERVER_PORT=8080
+      - AUTH_ENABLED=false
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - simulator-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  simulator-network:
+    driver: bridge

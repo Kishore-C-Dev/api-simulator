@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="'API Simulator - ' + ${title ?: 'Dashboard'}">API Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <style>
+        .htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }
+        .htmx-request .htmx-indicator { opacity: 1; }
+        .spinner { border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-8">
+                    <a th:href="@{/}" class="text-xl font-bold">API Simulator</a>
+                    <div class="hidden md:flex space-x-4">
+                        <a th:href="@{/}" class="hover:bg-blue-700 px-3 py-2 rounded transition-colors">Dashboard</a>
+                        <a th:href="@{/mappings/new}" class="hover:bg-blue-700 px-3 py-2 rounded transition-colors">New Mapping</a>
+                        <a th:href="@{/test}" class="hover:bg-blue-700 px-3 py-2 rounded transition-colors">Test Panel</a>
+                        <a th:href="@{/import-export}" class="hover:bg-blue-700 px-3 py-2 rounded transition-colors">Import/Export</a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button 
+                        class="bg-blue-500 hover:bg-blue-700 px-4 py-2 rounded transition-colors"
+                        hx-post="/admin/mappings/refresh"
+                        hx-target="#refresh-result"
+                        hx-indicator="#refresh-spinner">
+                        <div id="refresh-spinner" class="htmx-indicator spinner inline-block mr-2"></div>
+                        Refresh WireMock
+                    </button>
+                    <div id="refresh-result" class="text-sm"></div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-8">
+        <div th:replace="~{::content}"><!-- Content will be inserted here --></div>
+    </main>
+
+    <div class="fixed bottom-4 right-4">
+        <div id="toast" class="hidden bg-green-500 text-white px-4 py-2 rounded shadow-lg">
+            <span id="toast-message"></span>
+        </div>
+    </div>
+
+    <script>
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            
+            toast.className = 'bg-' + (type === 'error' ? 'red' : 'green') + '-500 text-white px-4 py-2 rounded shadow-lg';
+            toastMessage.textContent = message;
+            toast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.successful) {
+                const response = evt.detail.xhr.responseText;
+                if (response.includes('"success":true')) {
+                    showToast('Operation completed successfully');
+                }
+            } else {
+                showToast('Operation failed', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

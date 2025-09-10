@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout}">
+<head>
+    <title>Dashboard - API Simulator</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-900 mb-4 md:mb-0">API Mappings Dashboard</h1>
+                <div class="flex flex-col md:flex-row gap-4">
+                    <form class="flex" hx-get="/" hx-target="main" hx-trigger="input changed delay:500ms from:#search, submit">
+                        <input 
+                            id="search"
+                            name="search" 
+                            type="text" 
+                            placeholder="Search mappings..."
+                            th:value="${search}"
+                            class="border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-r-lg hover:bg-blue-600 transition-colors">
+                            Search
+                        </button>
+                    </form>
+                    <a th:href="@{/mappings/new}" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors text-center">
+                        New Mapping
+                    </a>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Path</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr th:if="${mappings.empty}" class="text-center">
+                            <td colspan="6" class="px-6 py-4 text-sm text-gray-500">
+                                No mappings found. <a th:href="@{/mappings/new}" class="text-blue-500 hover:underline">Create your first mapping</a>
+                            </td>
+                        </tr>
+                        <tr th:each="mapping : ${mappings.content}" class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" th:text="${mapping.name}">Mapping Name</div>
+                                <div class="text-sm text-gray-500" th:if="${mapping.tags}">
+                                    <span th:each="tag : ${mapping.tags}" 
+                                          class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1" 
+                                          th:text="${tag}">tag</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full"
+                                      th:text="${mapping.request.method}"
+                                      th:class="${mapping.request.method == 'GET' ? 'bg-blue-100 text-blue-800' : 
+                                                mapping.request.method == 'POST' ? 'bg-green-100 text-green-800' :
+                                                mapping.request.method == 'PUT' ? 'bg-yellow-100 text-yellow-800' :
+                                                mapping.request.method == 'DELETE' ? 'bg-red-100 text-red-800' :
+                                                'bg-gray-100 text-gray-800'}">GET</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" th:text="${mapping.request.path}">
+                                /api/path
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full"
+                                      th:text="${mapping.enabled ? 'Enabled' : 'Disabled'}"
+                                      th:class="${mapping.enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                    Enabled
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" th:text="${mapping.priority}">5</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                <a th:href="@{'/mappings/' + ${mapping.id} + '/edit'}" 
+                                   class="text-blue-600 hover:text-blue-900">Edit</a>
+                                <button 
+                                    class="text-red-600 hover:text-red-900"
+                                    th:attr="hx-delete=@{'/admin/mappings/' + ${mapping.id}}"
+                                    hx-confirm="Are you sure you want to delete this mapping?"
+                                    hx-target="closest tr"
+                                    hx-swap="outerHTML">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div th:if="${mappings.totalPages > 1}" class="flex items-center justify-between mt-6">
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-gray-700">
+                        Showing <span th:text="${mappings.number * mappings.size + 1}">1</span> to 
+                        <span th:text="${mappings.number * mappings.size + mappings.numberOfElements}">10</span> of 
+                        <span th:text="${mappings.totalElements}">100</span> results
+                    </span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <a th:if="${currentPage > 0}" 
+                       th:href="@{'/?page=' + ${currentPage - 1} + (${search} ? '&search=' + ${search} : '')}"
+                       class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        Previous
+                    </a>
+                    
+                    <span th:each="i : ${#numbers.sequence(0, totalPages - 1)}" 
+                          th:if="${i >= currentPage - 2 && i <= currentPage + 2}">
+                        <a th:if="${i != currentPage}"
+                           th:href="@{'/?page=' + ${i} + (${search} ? '&search=' + ${search} : '')}"
+                           th:text="${i + 1}"
+                           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50"></a>
+                        <span th:if="${i == currentPage}"
+                              th:text="${i + 1}"
+                              class="px-3 py-2 bg-blue-600 border border-blue-600 rounded-md text-sm font-medium text-white"></span>
+                    </span>
+                    
+                    <a th:if="${currentPage < totalPages - 1}" 
+                       th:href="@{'/?page=' + ${currentPage + 1} + (${search} ? '&search=' + ${search} : '')}"
+                       class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        Next
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

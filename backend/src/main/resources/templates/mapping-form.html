@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout}">
+<head>
+    <title th:text="(${isEdit} ? 'Edit' : 'New') + ' Mapping - API Simulator'">New Mapping - API Simulator</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-900" th:text="${isEdit} ? 'Edit Mapping' : 'Create New Mapping'">
+                    Create New Mapping
+                </h1>
+                <a th:href="@{/}" class="text-blue-600 hover:text-blue-800">← Back to Dashboard</a>
+            </div>
+
+            <form method="POST" 
+                  th:action="${isEdit} ? @{'/admin/mappings/' + ${mapping.id} + '/form'} : @{/admin/mappings/form}"
+                  class="space-y-6">
+                
+                <!-- No method override needed - using POST for both create and update -->
+
+                <div id="form-result"></div>
+
+                <!-- Basic Information -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Mapping Name</label>
+                        <input type="text" id="name" name="name" required
+                               th:value="${mapping.name}"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="priority" class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                        <input type="number" id="priority" name="priority" min="1" max="10"
+                               th:value="${mapping.priority} ?: 5"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="enabled" class="flex items-center space-x-2">
+                            <input type="checkbox" id="enabled" name="enabled" 
+                                   th:checked="${mapping.enabled} ?: true"
+                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm font-medium text-gray-700">Enabled</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label for="tags" class="block text-sm font-medium text-gray-700 mb-2">Tags (comma-separated)</label>
+                        <input type="text" id="tags" name="tags"
+                               th:value="${mapping.tags} ? ${#strings.listJoin(mapping.tags, ', ')} : ''"
+                               placeholder="api, v1, customer"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <!-- Request Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Request Configuration</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="method" class="block text-sm font-medium text-gray-700 mb-2">HTTP Method</label>
+                            <select id="method" name="requestMethod" required
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="GET" th:selected="${mapping.request?.method == 'GET'}">GET</option>
+                                <option value="POST" th:selected="${mapping.request?.method == 'POST'}">POST</option>
+                                <option value="PUT" th:selected="${mapping.request?.method == 'PUT'}">PUT</option>
+                                <option value="DELETE" th:selected="${mapping.request?.method == 'DELETE'}">DELETE</option>
+                                <option value="PATCH" th:selected="${mapping.request?.method == 'PATCH'}">PATCH</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="path" class="block text-sm font-medium text-gray-700 mb-2">Path</label>
+                            <input type="text" id="path" name="requestPath" required
+                                   th:value="${mapping.request?.path}"
+                                   placeholder="/api/customers/{id}"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="headers" class="block text-sm font-medium text-gray-700 mb-2">
+                            Request Headers (JSON format)
+                        </label>
+                        <textarea id="headers" name="requestHeaders" rows="3"
+                                  placeholder='{"X-Tenant": "acme", "Authorization": "Bearer token"}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  th:text="${requestHeadersJson}"></textarea>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="queryParams" class="block text-sm font-medium text-gray-700 mb-2">
+                            Query Parameters (JSON format)
+                        </label>
+                        <textarea id="queryParams" name="requestQueryParams" rows="3"
+                                  placeholder='{"active": "true", "limit": "10"}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  th:text="${requestQueryParamsJson}"></textarea>
+                    </div>
+                </div>
+
+                <!-- Response Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Response Configuration</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="status" class="block text-sm font-medium text-gray-700 mb-2">HTTP Status</label>
+                            <input type="number" id="status" name="responseStatus" min="100" max="599"
+                                   th:value="${mapping.response?.status} ?: 200"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="templating" class="flex items-center space-x-2">
+                                <input type="checkbox" id="templating" name="templatingEnabled"
+                                       th:checked="${mapping.response?.templatingEnabled}"
+                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm font-medium text-gray-700">Enable Handlebars Templating</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="responseHeaders" class="block text-sm font-medium text-gray-700 mb-2">
+                            Response Headers (JSON format)
+                        </label>
+                        <textarea id="responseHeaders" name="responseHeaders" rows="3"
+                                  placeholder='{"Content-Type": "application/json", "X-Custom": "value"}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  th:text="${responseHeadersJson}"></textarea>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="body" class="block text-sm font-medium text-gray-700 mb-2">Response Body (JSON only)</label>
+                        <textarea id="body" name="responseBody" rows="8" required
+                                  placeholder='{"id": "{{request.pathSegments.[2]}}", "name": "Customer Name", "active": true}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  th:text="${mapping.response?.body}"></textarea>
+                    </div>
+                </div>
+
+                <!-- Delay Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Delay & Chaos Configuration</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label for="delayMode" class="block text-sm font-medium text-gray-700 mb-2">Delay Mode</label>
+                            <select id="delayMode" name="delayMode"
+                                    onchange="toggleDelayFields()"
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="fixed" th:selected="${mapping.delays?.mode == 'fixed'}">Fixed</option>
+                                <option value="variable" th:selected="${mapping.delays?.mode == 'variable'}">Variable</option>
+                            </select>
+                        </div>
+                        <div id="fixedDelayDiv">
+                            <label for="fixedMs" class="block text-sm font-medium text-gray-700 mb-2">Fixed Delay (ms)</label>
+                            <input type="number" id="fixedMs" name="fixedMs" min="0"
+                                   th:value="${mapping.delays?.fixedMs} ?: 0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div id="variableDelayDiv" style="display: none;">
+                            <label for="variableMinMs" class="block text-sm font-medium text-gray-700 mb-2">Min Delay (ms)</label>
+                            <input type="number" id="variableMinMs" name="variableMinMs" min="0"
+                                   th:value="${mapping.delays?.variableMinMs} ?: 100"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
+                            <label for="variableMaxMs" class="block text-sm font-medium text-gray-700 mb-2">Max Delay (ms)</label>
+                            <input type="number" id="variableMaxMs" name="variableMaxMs" min="0"
+                                   th:value="${mapping.delays?.variableMaxMs} ?: 500"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="errorRatePercent" class="block text-sm font-medium text-gray-700 mb-2">Error Rate (%)</label>
+                            <input type="number" id="errorRatePercent" name="errorRatePercent" min="0" max="100"
+                                   th:value="${mapping.delays?.errorRatePercent} ?: 0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="errorStatus" class="block text-sm font-medium text-gray-700 mb-2">Error Status</label>
+                            <input type="number" id="errorStatus" name="errorStatus" min="400" max="599"
+                                   th:value="${mapping.delays?.errorResponse?.status} ?: 500"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="errorBody" class="block text-sm font-medium text-gray-700 mb-2">Error Response Body (JSON)</label>
+                        <textarea id="errorBody" name="errorBody" rows="3"
+                                  placeholder='{"error": "Service temporarily unavailable", "code": 503}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  th:text="${mapping.delays?.errorResponse?.body}"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Conditional Responses Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Conditional Responses</h3>
+                    <p class="text-sm text-gray-600 mb-4">Configure responses based on request ID headers for testing different scenarios.</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="conditionalResponsesEnabled" class="flex items-center space-x-2">
+                                <input type="checkbox" id="conditionalResponsesEnabled" name="conditionalResponsesEnabled" 
+                                       th:checked="${mapping.response?.conditionalResponses?.enabled}"
+                                       onchange="toggleConditionalResponses()"
+                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm font-medium text-gray-700">Enable Conditional Responses</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label for="requestIdHeader" class="block text-sm font-medium text-gray-700 mb-2">Request ID Header Name</label>
+                            <input type="text" id="requestIdHeader" name="requestIdHeader"
+                                   th:value="${mapping.response?.conditionalResponses?.requestIdHeader} ?: 'X-Request-ID'"
+                                   placeholder="X-Request-ID"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div id="conditionalResponsesConfig" class="mt-4" style="display: none;">
+                        <div class="flex items-center justify-between mb-4">
+                            <label class="block text-sm font-medium text-gray-700">
+                                Conditional Response Mappings
+                            </label>
+                            <button type="button" onclick="addConditionalResponseMapping()" 
+                                    class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition-colors flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Add Mapping
+                            </button>
+                        </div>
+                        
+                        <div id="conditionalMappingsList" class="space-y-3">
+                            <!-- Dynamic conditional mappings will be added here -->
+                        </div>
+                        
+                        <!-- Hidden textarea for form submission -->
+                        <textarea id="conditionalResponsesJson" name="conditionalResponsesJson" style="display: none;"
+                                  th:text="${conditionalResponsesJson}"></textarea>
+                        
+                        <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p class="text-xs text-blue-700 mb-2">
+                                <strong>How it works:</strong> When a request includes the specified header with a matching Request ID, 
+                                the corresponding status and response body will be returned instead of the default response.
+                            </p>
+                            <p class="text-xs text-blue-600">
+                                <strong>Example:</strong> Send <code>X-Request-ID: success-200</code> to get a 200 success response, 
+                                or <code>X-Request-ID: error-400</code> to simulate a 400 error.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Setup Buttons -->
+                    <div id="conditionalResponsesActions" class="mt-4" style="display: none;">
+                        <div class="flex space-x-2">
+                            <button type="button" onclick="useDefaultConditionalResponses()" 
+                                    class="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors">
+                                Use Default Mappings
+                            </button>
+                            <button type="button" onclick="clearConditionalResponses()" 
+                                    class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="flex items-center justify-between pt-6 border-t">
+                    <a th:href="@{/}" class="text-gray-600 hover:text-gray-800">Cancel</a>
+                    <div class="space-x-4">
+                        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                            <span th:text="${isEdit} ? 'Update Mapping' : 'Create Mapping'">Create Mapping</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <script>
+            function toggleDelayFields() {
+                const mode = document.getElementById('delayMode').value;
+                const fixedDiv = document.getElementById('fixedDelayDiv');
+                const variableDiv = document.getElementById('variableDelayDiv');
+                
+                if (mode === 'variable') {
+                    fixedDiv.style.display = 'none';
+                    variableDiv.style.display = 'block';
+                } else {
+                    fixedDiv.style.display = 'block';
+                    variableDiv.style.display = 'none';
+                }
+            }
+            
+            // Initialize on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                toggleDelayFields();
+                toggleConditionalResponses();
+                loadExistingConditionalMappings();
+            });
+
+            function toggleConditionalResponses() {
+                const enabled = document.getElementById('conditionalResponsesEnabled').checked;
+                const config = document.getElementById('conditionalResponsesConfig');
+                const actions = document.getElementById('conditionalResponsesActions');
+                
+                if (enabled) {
+                    config.style.display = 'block';
+                    actions.style.display = 'block';
+                } else {
+                    config.style.display = 'none';
+                    actions.style.display = 'none';
+                }
+            }
+
+            let conditionalMappingCounter = 0;
+
+            function addConditionalResponseMapping(requestId = '', status = 200, body = '') {
+                conditionalMappingCounter++;
+                const mappingsList = document.getElementById('conditionalMappingsList');
+                
+                const mappingDiv = document.createElement('div');
+                mappingDiv.className = 'border border-gray-200 rounded-lg p-4 bg-gray-50';
+                mappingDiv.id = `conditionalMapping-${conditionalMappingCounter}`;
+                
+                mappingDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-medium text-gray-900">Mapping #${conditionalMappingCounter}</h4>
+                        <button type="button" onclick="removeConditionalResponseMapping('conditionalMapping-${conditionalMappingCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Request ID</label>
+                            <input type="text" class="conditional-request-id w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${requestId}" placeholder="success-200" onchange="updateConditionalResponsesJson()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">HTTP Status</label>
+                            <select class="conditional-status w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    onchange="updateConditionalResponsesJson()">
+                                <option value="200" ${status == 200 ? 'selected' : ''}>200 - Success</option>
+                                <option value="201" ${status == 201 ? 'selected' : ''}>201 - Created</option>
+                                <option value="400" ${status == 400 ? 'selected' : ''}>400 - Bad Request</option>
+                                <option value="401" ${status == 401 ? 'selected' : ''}>401 - Unauthorized</option>
+                                <option value="403" ${status == 403 ? 'selected' : ''}>403 - Forbidden</option>
+                                <option value="404" ${status == 404 ? 'selected' : ''}>404 - Not Found</option>
+                                <option value="409" ${status == 409 ? 'selected' : ''}>409 - Conflict</option>
+                                <option value="422" ${status == 422 ? 'selected' : ''}>422 - Unprocessable Entity</option>
+                                <option value="500" ${status == 500 ? 'selected' : ''}>500 - Internal Server Error</option>
+                                <option value="502" ${status == 502 ? 'selected' : ''}>502 - Bad Gateway</option>
+                                <option value="503" ${status == 503 ? 'selected' : ''}>503 - Service Unavailable</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Response Body (JSON)</label>
+                            <textarea class="conditional-body w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                      rows="2" placeholder='{"status": "success"}' onchange="updateConditionalResponsesJson()">${body}</textarea>
+                        </div>
+                    </div>
+                `;
+                
+                mappingsList.appendChild(mappingDiv);
+                updateConditionalResponsesJson();
+            }
+
+            function removeConditionalResponseMapping(mappingId) {
+                const mappingDiv = document.getElementById(mappingId);
+                if (mappingDiv) {
+                    mappingDiv.remove();
+                    updateConditionalResponsesJson();
+                }
+            }
+
+            function updateConditionalResponsesJson() {
+                const mappings = [];
+                const mappingDivs = document.querySelectorAll('[id^="conditionalMapping-"]');
+                
+                mappingDivs.forEach(div => {
+                    const requestId = div.querySelector('.conditional-request-id').value.trim();
+                    const status = parseInt(div.querySelector('.conditional-status').value);
+                    const body = div.querySelector('.conditional-body').value.trim();
+                    
+                    if (requestId) {
+                        mappings.push({
+                            requestId: requestId,
+                            status: status,
+                            body: body || `{"status": "${status >= 400 ? 'error' : 'success'}", "requestId": "${requestId}"}`
+                        });
+                    }
+                });
+                
+                document.getElementById('conditionalResponsesJson').value = JSON.stringify(mappings);
+            }
+
+            function useDefaultConditionalResponses() {
+                // Clear existing mappings
+                document.getElementById('conditionalMappingsList').innerHTML = '';
+                conditionalMappingCounter = 0;
+                
+                // Add default mappings
+                addConditionalResponseMapping('success-200', 200, '{"status": "success", "message": "Request processed successfully"}');
+                addConditionalResponseMapping('error-400', 400, '{"status": "error", "message": "Bad request - invalid parameters", "errorCode": "INVALID_PARAMETERS"}');
+                addConditionalResponseMapping('error-500', 500, '{"status": "error", "message": "Internal server error - service unavailable", "errorCode": "SERVICE_UNAVAILABLE"}');
+            }
+
+            function clearConditionalResponses() {
+                document.getElementById('conditionalMappingsList').innerHTML = '';
+                conditionalMappingCounter = 0;
+                updateConditionalResponsesJson();
+            }
+
+            // Load existing mappings when page loads
+            function loadExistingConditionalMappings() {
+                const jsonTextarea = document.getElementById('conditionalResponsesJson');
+                if (jsonTextarea && jsonTextarea.value.trim()) {
+                    try {
+                        const mappings = JSON.parse(jsonTextarea.value);
+                        mappings.forEach(mapping => {
+                            addConditionalResponseMapping(
+                                mapping.requestId || '',
+                                mapping.status || 200,
+                                mapping.body || ''
+                            );
+                        });
+                    } catch (e) {
+                        console.warn('Failed to parse existing conditional responses:', e);
+                    }
+                }
+            }
+        </script>
+    </div>
+</body>
+</html>
