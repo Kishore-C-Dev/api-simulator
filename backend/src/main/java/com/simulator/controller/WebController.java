@@ -37,13 +37,39 @@ public class WebController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir,
             Model model) {
         
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "priority"));
+        // Build sort configuration - default is name ASC, then priority ASC
+        Sort sort;
+        Sort.Direction direction = Sort.Direction.fromString(sortDir);
+        
+        if ("name".equals(sortBy)) {
+            sort = Sort.by(direction, "name")
+                      .and(Sort.by(Sort.Direction.ASC, "priority"));
+        } else if ("priority".equals(sortBy)) {
+            sort = Sort.by(direction, "priority")
+                      .and(Sort.by(Sort.Direction.ASC, "name"));
+        } else if ("method".equals(sortBy)) {
+            sort = Sort.by(direction, "request.method")
+                      .and(Sort.by(Sort.Direction.ASC, "name"));
+        } else if ("path".equals(sortBy)) {
+            sort = Sort.by(direction, "request.path")
+                      .and(Sort.by(Sort.Direction.ASC, "name"));
+        } else {
+            // Default sorting: name ASC, then priority ASC (this should apply when no sortBy is specified)
+            sort = Sort.by(Sort.Direction.ASC, "name")
+                      .and(Sort.by(Sort.Direction.ASC, "priority"));
+        }
+        
+        Pageable pageable = PageRequest.of(page, size, sort);
         Page<RequestMapping> mappings = mappingService.searchMappings(search, pageable);
         
         model.addAttribute("mappings", mappings);
         model.addAttribute("search", search != null ? search : "");
+        model.addAttribute("sortBy", sortBy);
+        model.addAttribute("sortDir", sortDir);
         model.addAttribute("currentPage", page);
         model.addAttribute("totalPages", mappings.getTotalPages());
         
@@ -58,6 +84,17 @@ public class WebController {
         model.addAttribute("requestHeadersJson", "{}");
         model.addAttribute("requestQueryParamsJson", "{}");
         model.addAttribute("responseHeadersJson", "{}");
+        model.addAttribute("conditionalResponsesJson", "[]");
+        // Add default advanced pattern values
+        model.addAttribute("pathMatchingMode", "simple");
+        model.addAttribute("pathMatchType", "EXACT");
+        model.addAttribute("pathPattern", "");
+        model.addAttribute("pathIgnoreCase", false);
+        model.addAttribute("headerMatchingMode", "simple");
+        model.addAttribute("headerPatternsJson", "{}");
+        model.addAttribute("queryParamMatchingMode", "simple");
+        model.addAttribute("queryParamPatternsJson", "{}");
+        model.addAttribute("bodyPatternsJson", "[]");
         return "mapping-form";
     }
 
@@ -96,6 +133,58 @@ public class WebController {
                         model.addAttribute("conditionalResponsesJson", objectMapper.writeValueAsString(mapping.getResponse().getConditionalResponses().getRequestIdMappings()));
                     } else {
                         model.addAttribute("conditionalResponsesJson", "[]");
+                    }
+                    
+                    // Add advanced pattern data for editing
+                    if (mapping.getRequest() != null) {
+                        // Path pattern
+                        if (mapping.getRequest().getPathPattern() != null) {
+                            model.addAttribute("pathMatchingMode", "advanced");
+                            model.addAttribute("pathMatchType", mapping.getRequest().getPathPattern().getMatchType().name());
+                            model.addAttribute("pathPattern", mapping.getRequest().getPathPattern().getPattern());
+                            model.addAttribute("pathIgnoreCase", mapping.getRequest().getPathPattern().isIgnoreCase());
+                        } else {
+                            model.addAttribute("pathMatchingMode", "simple");
+                            model.addAttribute("pathMatchType", "EXACT");
+                            model.addAttribute("pathPattern", "");
+                            model.addAttribute("pathIgnoreCase", false);
+                        }
+                        
+                        // Header patterns
+                        if (mapping.getRequest().getHeaderPatterns() != null && !mapping.getRequest().getHeaderPatterns().isEmpty()) {
+                            model.addAttribute("headerMatchingMode", "advanced");
+                            model.addAttribute("headerPatternsJson", objectMapper.writeValueAsString(mapping.getRequest().getHeaderPatterns()));
+                        } else {
+                            model.addAttribute("headerMatchingMode", "simple");
+                            model.addAttribute("headerPatternsJson", "{}");
+                        }
+                        
+                        // Query param patterns
+                        if (mapping.getRequest().getQueryParamPatterns() != null && !mapping.getRequest().getQueryParamPatterns().isEmpty()) {
+                            model.addAttribute("queryParamMatchingMode", "advanced");
+                            model.addAttribute("queryParamPatternsJson", objectMapper.writeValueAsString(mapping.getRequest().getQueryParamPatterns()));
+                        } else {
+                            model.addAttribute("queryParamMatchingMode", "simple");
+                            model.addAttribute("queryParamPatternsJson", "{}");
+                        }
+                        
+                        // Body patterns
+                        if (mapping.getRequest().getBodyPatterns() != null && !mapping.getRequest().getBodyPatterns().isEmpty()) {
+                            model.addAttribute("bodyPatternsJson", objectMapper.writeValueAsString(mapping.getRequest().getBodyPatterns()));
+                        } else {
+                            model.addAttribute("bodyPatternsJson", "[]");
+                        }
+                    } else {
+                        // Default values for new mappings
+                        model.addAttribute("pathMatchingMode", "simple");
+                        model.addAttribute("pathMatchType", "EXACT");
+                        model.addAttribute("pathPattern", "");
+                        model.addAttribute("pathIgnoreCase", false);
+                        model.addAttribute("headerMatchingMode", "simple");
+                        model.addAttribute("headerPatternsJson", "{}");
+                        model.addAttribute("queryParamMatchingMode", "simple");
+                        model.addAttribute("queryParamPatternsJson", "{}");
+                        model.addAttribute("bodyPatternsJson", "[]");
                     }
                     
                     return "mapping-form";
@@ -137,7 +226,17 @@ public class WebController {
             @RequestParam(required = false) Integer variableMaxMs,
             @RequestParam(defaultValue = "0") Integer errorRatePercent,
             @RequestParam(required = false) Integer errorStatus,
-            @RequestParam(required = false) String errorBody) {
+            @RequestParam(required = false) String errorBody,
+            // Advanced pattern matching parameters
+            @RequestParam(required = false) String pathMatchingMode,
+            @RequestParam(required = false) String pathMatchType,
+            @RequestParam(required = false) String pathPattern,
+            @RequestParam(defaultValue = "false") Boolean pathIgnoreCase,
+            @RequestParam(required = false) String headerMatchingMode,
+            @RequestParam(required = false) String headerPatternsJson,
+            @RequestParam(required = false) String queryParamMatchingMode,
+            @RequestParam(required = false) String queryParamPatternsJson,
+            @RequestParam(required = false) String bodyPatternsJson) {
         
         try {
             logger.info("Creating mapping from form submission");
@@ -145,7 +244,10 @@ public class WebController {
                 requestMethod, requestPath, requestHeaders, requestQueryParams,
                 responseStatus, responseHeaders, responseBody, templatingEnabled,
                 delayMode, fixedMs, variableMinMs, variableMaxMs, 
-                errorRatePercent, errorStatus, errorBody);
+                errorRatePercent, errorStatus, errorBody,
+                pathMatchingMode, pathMatchType, pathPattern, pathIgnoreCase,
+                headerMatchingMode, headerPatternsJson, queryParamMatchingMode,
+                queryParamPatternsJson, bodyPatternsJson);
             
             mappingService.saveMapping(mapping);
             return "redirect:/";
@@ -176,7 +278,17 @@ public class WebController {
             @RequestParam(required = false) Integer variableMaxMs,
             @RequestParam(defaultValue = "0") Integer errorRatePercent,
             @RequestParam(required = false) Integer errorStatus,
-            @RequestParam(required = false) String errorBody) {
+            @RequestParam(required = false) String errorBody,
+            // Advanced pattern matching parameters
+            @RequestParam(required = false) String pathMatchingMode,
+            @RequestParam(required = false) String pathMatchType,
+            @RequestParam(required = false) String pathPattern,
+            @RequestParam(defaultValue = "false") Boolean pathIgnoreCase,
+            @RequestParam(required = false) String headerMatchingMode,
+            @RequestParam(required = false) String headerPatternsJson,
+            @RequestParam(required = false) String queryParamMatchingMode,
+            @RequestParam(required = false) String queryParamPatternsJson,
+            @RequestParam(required = false) String bodyPatternsJson) {
         
         try {
             logger.info("Updating mapping {} from form submission", id);
@@ -184,7 +296,10 @@ public class WebController {
                 requestMethod, requestPath, requestHeaders, requestQueryParams,
                 responseStatus, responseHeaders, responseBody, templatingEnabled,
                 delayMode, fixedMs, variableMinMs, variableMaxMs, 
-                errorRatePercent, errorStatus, errorBody);
+                errorRatePercent, errorStatus, errorBody,
+                pathMatchingMode, pathMatchType, pathPattern, pathIgnoreCase,
+                headerMatchingMode, headerPatternsJson, queryParamMatchingMode,
+                queryParamPatternsJson, bodyPatternsJson);
             
             mapping.setId(id);
             mappingService.saveMapping(mapping);
@@ -199,7 +314,11 @@ public class WebController {
             String requestMethod, String requestPath, String requestHeaders, String requestQueryParams,
             Integer responseStatus, String responseHeaders, String responseBody, Boolean templatingEnabled,
             String delayMode, Integer fixedMs, Integer variableMinMs, Integer variableMaxMs,
-            Integer errorRatePercent, Integer errorStatus, String errorBody) throws Exception {
+            Integer errorRatePercent, Integer errorStatus, String errorBody,
+            String pathMatchingMode, String pathMatchType, String pathPattern, Boolean pathIgnoreCase,
+            String headerMatchingMode, String headerPatternsJson,
+            String queryParamMatchingMode, String queryParamPatternsJson,
+            String bodyPatternsJson) throws Exception {
         
         RequestMapping mapping = new RequestMapping();
         mapping.setName(name);
@@ -223,6 +342,11 @@ public class WebController {
         if (requestQueryParams != null && !requestQueryParams.trim().isEmpty()) {
             request.setQueryParams(objectMapper.readValue(requestQueryParams, Map.class));
         }
+        
+        // Process advanced pattern matching
+        processAdvancedPatterns(request, pathMatchingMode, pathMatchType, pathPattern, pathIgnoreCase,
+                              headerMatchingMode, headerPatternsJson, queryParamMatchingMode, 
+                              queryParamPatternsJson, bodyPatternsJson);
         
         mapping.setRequest(request);
         
@@ -258,5 +382,54 @@ public class WebController {
         }
         
         return mapping;
+    }
+    
+    private void processAdvancedPatterns(RequestMapping.RequestSpec request, 
+                                       String pathMatchingMode, String pathMatchType, String pathPattern, Boolean pathIgnoreCase,
+                                       String headerMatchingMode, String headerPatternsJson,
+                                       String queryParamMatchingMode, String queryParamPatternsJson,
+                                       String bodyPatternsJson) throws Exception {
+        
+        // Process Path Pattern
+        if ("advanced".equals(pathMatchingMode) && pathMatchType != null && pathPattern != null) {
+            RequestMapping.PathPattern pathPatternObj = new RequestMapping.PathPattern();
+            pathPatternObj.setMatchType(RequestMapping.PathPattern.MatchType.valueOf(pathMatchType.toUpperCase()));
+            pathPatternObj.setPattern(pathPattern);
+            pathPatternObj.setIgnoreCase(pathIgnoreCase != null ? pathIgnoreCase : false);
+            request.setPathPattern(pathPatternObj);
+        }
+        
+        // Process Header Patterns
+        if ("advanced".equals(headerMatchingMode) && headerPatternsJson != null && !headerPatternsJson.trim().isEmpty()) {
+            try {
+                java.util.Map<String, RequestMapping.ParameterPattern> headerPatterns = objectMapper.readValue(
+                    headerPatternsJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, RequestMapping.ParameterPattern>>() {});
+                request.setHeaderPatterns(headerPatterns);
+            } catch (Exception e) {
+                logger.warn("Failed to parse header patterns JSON: {}", e.getMessage());
+            }
+        }
+        
+        // Process Query Parameter Patterns
+        if ("advanced".equals(queryParamMatchingMode) && queryParamPatternsJson != null && !queryParamPatternsJson.trim().isEmpty()) {
+            try {
+                java.util.Map<String, RequestMapping.ParameterPattern> queryParamPatterns = objectMapper.readValue(
+                    queryParamPatternsJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, RequestMapping.ParameterPattern>>() {});
+                request.setQueryParamPatterns(queryParamPatterns);
+            } catch (Exception e) {
+                logger.warn("Failed to parse query parameter patterns JSON: {}", e.getMessage());
+            }
+        }
+        
+        // Process Body Patterns
+        if (bodyPatternsJson != null && !bodyPatternsJson.trim().isEmpty()) {
+            try {
+                java.util.List<RequestMapping.BodyPattern> bodyPatterns = objectMapper.readValue(
+                    bodyPatternsJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.List<RequestMapping.BodyPattern>>() {});
+                request.setBodyPatterns(bodyPatterns);
+            } catch (Exception e) {
+                logger.warn("Failed to parse body patterns JSON: {}", e.getMessage());
+            }
+        }
     }
 }

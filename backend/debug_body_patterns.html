@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Body Patterns</title>
+</head>
+<body>
+    <div id="bodyPatternsList"></div>
+    <textarea id="bodyPatternsJson" style="display: none;">[{"matchType":"REGEX","expr":"","expected":"^(?!.*\"account_number\").*$","ignoreCase":false,"matcher":"regex"}]</textarea>
+    
+    <script>
+        let bodyPatternCounter = 0;
+        
+        function decodeHtmlEntities(text) {
+            try {
+                let decoded = text;
+                decoded = decoded.replace(/&quot;/g, '"');
+                decoded = decoded.replace(/&lt;/g, '<');
+                decoded = decoded.replace(/&gt;/g, '>');
+                decoded = decoded.replace(/&amp;/g, '&');
+                return decoded;
+            } catch (e) {
+                console.error('Error in decodeHtmlEntities:', e);
+                return text;
+            }
+        }
+
+        function addBodyPattern(matchType = 'EXACT', expr = '', expected = '', ignoreCase = false) {
+            bodyPatternCounter++;
+            const patternsList = document.getElementById('bodyPatternsList');
+            
+            const patternDiv = document.createElement('div');
+            patternDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+            patternDiv.id = `bodyPattern-${bodyPatternCounter}`;
+            
+            patternDiv.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <h5>Body Pattern #${bodyPatternCounter}</h5>
+                </div>
+                <div>
+                    <label>Match Type:</label>
+                    <select class="body-pattern-match-type">
+                        <option value="EXACT" ${matchType === 'EXACT' ? 'selected' : ''}>Exact</option>
+                        <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                        <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                        <option value="JSONPATH" ${matchType === 'JSONPATH' ? 'selected' : ''}>JSONPath</option>
+                        <option value="XPATH" ${matchType === 'XPATH' ? 'selected' : ''}>XPath</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Expected Value:</label>
+                    <input type="text" class="body-pattern-expected" value="${expected}" placeholder="123">
+                </div>
+                <div>
+                    <label>Ignore Case:</label>
+                    <input type="checkbox" class="body-pattern-ignore-case" ${ignoreCase ? 'checked' : ''}>
+                </div>
+            `;
+            
+            patternsList.appendChild(patternDiv);
+            console.log('Added body pattern:', matchType, expr, expected, ignoreCase);
+        }
+
+        function loadExistingBodyPatterns() {
+            console.log('loadExistingBodyPatterns called');
+            const jsonTextarea = document.getElementById('bodyPatternsJson');
+            console.log('jsonTextarea found:', !!jsonTextarea);
+            
+            if (jsonTextarea && jsonTextarea.value.trim() && jsonTextarea.value !== '[]') {
+                console.log('jsonTextarea value:', jsonTextarea.value);
+                try {
+                    const decodedValue = decodeHtmlEntities(jsonTextarea.value);
+                    console.log('decodedValue:', decodedValue);
+                    const patterns = JSON.parse(decodedValue);
+                    console.log('parsed patterns:', patterns);
+                    
+                    patterns.forEach((pattern, index) => {
+                        console.log('Processing pattern', index, ':', pattern);
+                        addBodyPattern(
+                            pattern.matchType || 'EXACT',
+                            pattern.expr || '',
+                            pattern.expected || '',
+                            pattern.ignoreCase || false
+                        );
+                    });
+                } catch (e) {
+                    console.warn('Failed to parse existing body patterns:', e);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, calling loadExistingBodyPatterns');
+            loadExistingBodyPatterns();
+        });
+    </script>
+</body>
+</html>

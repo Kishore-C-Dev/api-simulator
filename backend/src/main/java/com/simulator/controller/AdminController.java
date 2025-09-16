@@ -30,6 +30,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+
+import com.fasterxml.jackson.core.type.TypeReference;
 
 @RestController
 @org.springframework.web.bind.annotation.RequestMapping("/admin")
@@ -116,7 +119,17 @@ public class AdminController {
             @RequestParam(required = false) String errorBody,
             @RequestParam(defaultValue = "false") Boolean conditionalResponsesEnabled,
             @RequestParam(required = false, defaultValue = "X-Request-ID") String requestIdHeader,
-            @RequestParam(required = false) String conditionalResponsesJson) {
+            @RequestParam(required = false) String conditionalResponsesJson,
+            // Advanced pattern matching parameters
+            @RequestParam(required = false) String pathMatchingMode,
+            @RequestParam(required = false) String pathMatchType,
+            @RequestParam(required = false) String pathPattern,
+            @RequestParam(defaultValue = "false") Boolean pathIgnoreCase,
+            @RequestParam(required = false) String headerMatchingMode,
+            @RequestParam(required = false) String headerPatternsJson,
+            @RequestParam(required = false) String queryParamMatchingMode,
+            @RequestParam(required = false) String queryParamPatternsJson,
+            @RequestParam(required = false) String bodyPatternsJson) {
         
         try {
             logger.info("Form POST request to /admin/mappings/{} (HTML Form)", id);
@@ -125,7 +138,10 @@ public class AdminController {
                 responseStatus, responseHeaders, responseBody, templatingEnabled,
                 delayMode, fixedMs, variableMinMs, variableMaxMs, 
                 errorRatePercent, errorStatus, errorBody,
-                conditionalResponsesEnabled, requestIdHeader, conditionalResponsesJson);
+                conditionalResponsesEnabled, requestIdHeader, conditionalResponsesJson,
+                pathMatchingMode, pathMatchType, pathPattern, pathIgnoreCase,
+                headerMatchingMode, headerPatternsJson, queryParamMatchingMode, 
+                queryParamPatternsJson, bodyPatternsJson);
             
             mapping.setId(id);
             RequestMapping saved = mappingService.saveMapping(mapping);
@@ -161,7 +177,17 @@ public class AdminController {
             @RequestParam(required = false) String errorBody,
             @RequestParam(defaultValue = "false") Boolean conditionalResponsesEnabled,
             @RequestParam(required = false, defaultValue = "X-Request-ID") String requestIdHeader,
-            @RequestParam(required = false) String conditionalResponsesJson) {
+            @RequestParam(required = false) String conditionalResponsesJson,
+            // Advanced pattern matching parameters
+            @RequestParam(required = false) String pathMatchingMode,
+            @RequestParam(required = false) String pathMatchType,
+            @RequestParam(required = false) String pathPattern,
+            @RequestParam(defaultValue = "false") Boolean pathIgnoreCase,
+            @RequestParam(required = false) String headerMatchingMode,
+            @RequestParam(required = false) String headerPatternsJson,
+            @RequestParam(required = false) String queryParamMatchingMode,
+            @RequestParam(required = false) String queryParamPatternsJson,
+            @RequestParam(required = false) String bodyPatternsJson) {
         
         try {
             logger.info("Form POST request to /admin/mappings (HTML Form)");
@@ -170,7 +196,10 @@ public class AdminController {
                 responseStatus, responseHeaders, responseBody, templatingEnabled,
                 delayMode, fixedMs, variableMinMs, variableMaxMs, 
                 errorRatePercent, errorStatus, errorBody,
-                conditionalResponsesEnabled, requestIdHeader, conditionalResponsesJson);
+                conditionalResponsesEnabled, requestIdHeader, conditionalResponsesJson,
+                pathMatchingMode, pathMatchType, pathPattern, pathIgnoreCase,
+                headerMatchingMode, headerPatternsJson, queryParamMatchingMode, 
+                queryParamPatternsJson, bodyPatternsJson);
             
             RequestMapping saved = mappingService.saveMapping(mapping);
             
@@ -187,7 +216,12 @@ public class AdminController {
             Integer responseStatus, String responseHeaders, String responseBody, Boolean templatingEnabled,
             String delayMode, Integer fixedMs, Integer variableMinMs, Integer variableMaxMs,
             Integer errorRatePercent, Integer errorStatus, String errorBody,
-            Boolean conditionalResponsesEnabled, String requestIdHeader, String conditionalResponsesJson) throws Exception {
+            Boolean conditionalResponsesEnabled, String requestIdHeader, String conditionalResponsesJson,
+            // Advanced pattern matching parameters
+            String pathMatchingMode, String pathMatchType, String pathPattern, Boolean pathIgnoreCase,
+            String headerMatchingMode, String headerPatternsJson,
+            String queryParamMatchingMode, String queryParamPatternsJson,
+            String bodyPatternsJson) throws Exception {
         
         RequestMapping mapping = new RequestMapping();
         mapping.setName(name);
@@ -211,6 +245,11 @@ public class AdminController {
         if (requestQueryParams != null && !requestQueryParams.trim().isEmpty()) {
             request.setQueryParams(objectMapper.readValue(requestQueryParams, Map.class));
         }
+        
+        // Process advanced pattern matching
+        processAdvancedPatterns(request, pathMatchingMode, pathMatchType, pathPattern, pathIgnoreCase,
+                              headerMatchingMode, headerPatternsJson, queryParamMatchingMode, 
+                              queryParamPatternsJson, bodyPatternsJson);
         
         mapping.setRequest(request);
         
@@ -270,6 +309,55 @@ public class AdminController {
         }
         
         return mapping;
+    }
+    
+    private void processAdvancedPatterns(RequestMapping.RequestSpec request, 
+                                       String pathMatchingMode, String pathMatchType, String pathPattern, Boolean pathIgnoreCase,
+                                       String headerMatchingMode, String headerPatternsJson,
+                                       String queryParamMatchingMode, String queryParamPatternsJson,
+                                       String bodyPatternsJson) throws Exception {
+        
+        // Process Path Pattern
+        if ("advanced".equals(pathMatchingMode) && pathMatchType != null && pathPattern != null) {
+            RequestMapping.PathPattern pathPatternObj = new RequestMapping.PathPattern();
+            pathPatternObj.setMatchType(RequestMapping.PathPattern.MatchType.valueOf(pathMatchType.toUpperCase()));
+            pathPatternObj.setPattern(pathPattern);
+            pathPatternObj.setIgnoreCase(pathIgnoreCase != null ? pathIgnoreCase : false);
+            request.setPathPattern(pathPatternObj);
+        }
+        
+        // Process Header Patterns
+        if ("advanced".equals(headerMatchingMode) && headerPatternsJson != null && !headerPatternsJson.trim().isEmpty()) {
+            try {
+                Map<String, RequestMapping.ParameterPattern> headerPatterns = objectMapper.readValue(
+                    headerPatternsJson, new TypeReference<Map<String, RequestMapping.ParameterPattern>>() {});
+                request.setHeaderPatterns(headerPatterns);
+            } catch (Exception e) {
+                logger.warn("Failed to parse header patterns JSON: {}", e.getMessage());
+            }
+        }
+        
+        // Process Query Parameter Patterns
+        if ("advanced".equals(queryParamMatchingMode) && queryParamPatternsJson != null && !queryParamPatternsJson.trim().isEmpty()) {
+            try {
+                Map<String, RequestMapping.ParameterPattern> queryParamPatterns = objectMapper.readValue(
+                    queryParamPatternsJson, new TypeReference<Map<String, RequestMapping.ParameterPattern>>() {});
+                request.setQueryParamPatterns(queryParamPatterns);
+            } catch (Exception e) {
+                logger.warn("Failed to parse query parameter patterns JSON: {}", e.getMessage());
+            }
+        }
+        
+        // Process Body Patterns
+        if (bodyPatternsJson != null && !bodyPatternsJson.trim().isEmpty()) {
+            try {
+                List<RequestMapping.BodyPattern> bodyPatterns = objectMapper.readValue(
+                    bodyPatternsJson, new TypeReference<List<RequestMapping.BodyPattern>>() {});
+                request.setBodyPatterns(bodyPatterns);
+            } catch (Exception e) {
+                logger.warn("Failed to parse body patterns JSON: {}", e.getMessage());
+            }
+        }
     }
 
     @DeleteMapping("/mappings/{id}")

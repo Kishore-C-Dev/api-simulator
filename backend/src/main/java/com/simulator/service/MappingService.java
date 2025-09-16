@@ -38,8 +38,10 @@ public class MappingService {
 
     public Page<RequestMapping> searchMappings(String query, Pageable pageable) {
         if (query != null && !query.trim().isEmpty()) {
-            return mappingRepository.findByDatasetAndNameContainingIgnoreCase(activeDataset, query.trim(), pageable);
+            // Use broader search criteria (name, path, method) with sorting support
+            return mappingRepository.findByDatasetAndSearchCriteria(activeDataset, query.trim(), pageable);
         }
+        // For no search, use the generic findByDataset which respects Pageable sorting
         return mappingRepository.findByDataset(activeDataset, pageable);
     }
 

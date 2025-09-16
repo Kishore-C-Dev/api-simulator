@@ -72,32 +72,190 @@
                             </select>
                         </div>
                         <div>
-                            <label for="path" class="block text-sm font-medium text-gray-700 mb-2">Path</label>
-                            <input type="text" id="path" name="requestPath" required
-                                   th:value="${mapping.request?.path}"
-                                   placeholder="/api/customers/{id}"
-                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <label for="pathMatchingMode" class="block text-sm font-medium text-gray-700 mb-2">Path Matching Mode</label>
+                            <select id="pathMatchingMode" name="pathMatchingMode" onchange="togglePathMatchingFields()"
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="simple">Simple Path (backward compatible)</option>
+                                <option value="advanced">Advanced Path Patterns</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div class="mt-4">
-                        <label for="headers" class="block text-sm font-medium text-gray-700 mb-2">
-                            Request Headers (JSON format)
-                        </label>
-                        <textarea id="headers" name="requestHeaders" rows="3"
-                                  placeholder='{"X-Tenant": "acme", "Authorization": "Bearer token"}'
-                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                                  th:text="${requestHeadersJson}"></textarea>
+                    <!-- Simple Path (Backward Compatible) -->
+                    <div id="simplePathDiv" class="mt-4">
+                        <label for="path" class="block text-sm font-medium text-gray-700 mb-2">Path</label>
+                        <input type="text" id="path" name="requestPath" required
+                               th:value="${mapping.request?.path}"
+                               placeholder="/api/customers/{id}"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Supports placeholders like {id} and wildcards like *</p>
                     </div>
 
-                    <div class="mt-4">
-                        <label for="queryParams" class="block text-sm font-medium text-gray-700 mb-2">
-                            Query Parameters (JSON format)
-                        </label>
-                        <textarea id="queryParams" name="requestQueryParams" rows="3"
-                                  placeholder='{"active": "true", "limit": "10"}'
-                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                                  th:text="${requestQueryParamsJson}"></textarea>
+                    <!-- Advanced Path Patterns -->
+                    <div id="advancedPathDiv" class="mt-4" style="display: none;">
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <h4 class="text-sm font-medium text-gray-900 mb-3">Advanced Path Pattern Configuration</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label for="pathMatchType" class="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
+                                    <select id="pathMatchType" name="pathMatchType"
+                                            class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="EXACT">Exact Match</option>
+                                        <option value="WILDCARD">Wildcard (* and ?)</option>
+                                        <option value="REGEX">Regular Expression</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="pathPattern" class="block text-sm font-medium text-gray-700 mb-1">Pattern</label>
+                                    <input type="text" id="pathPattern" name="pathPattern"
+                                           placeholder="/api/users/*"
+                                           class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div class="flex items-center">
+                                    <label for="pathIgnoreCase" class="flex items-center space-x-2">
+                                        <input type="checkbox" id="pathIgnoreCase" name="pathIgnoreCase"
+                                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <span class="text-sm font-medium text-gray-700">Ignore Case</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <p class="text-xs text-blue-600">
+                                    <strong>Examples:</strong><br>
+                                    • Exact: /api/users/123<br>
+                                    • Wildcard: /api/users/* (matches /api/users/123, /api/users/456/profile)<br>
+                                    • Regex: /api/users/\d+ (matches /api/users/123, /api/users/456)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Headers Configuration -->
+                    <div class="mt-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <label class="block text-sm font-medium text-gray-700">Request Headers Configuration</label>
+                            <div class="flex items-center space-x-4">
+                                <label for="headerMatchingMode" class="text-sm font-medium text-gray-700">Mode:</label>
+                                <select id="headerMatchingMode" name="headerMatchingMode" onchange="toggleHeaderMatchingFields()"
+                                        class="border border-gray-300 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="simple">Simple (JSON)</option>
+                                    <option value="advanced">Advanced Patterns</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Simple Headers (Backward Compatible) -->
+                        <div id="simpleHeadersDiv">
+                            <textarea id="headers" name="requestHeaders" rows="3"
+                                      placeholder='{"X-Tenant": "acme", "Authorization": "Bearer token"}'
+                                      class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                      th:text="${requestHeadersJson}"></textarea>
+                            <p class="text-xs text-gray-500 mt-1">JSON format for exact header matching</p>
+                        </div>
+
+                        <!-- Advanced Header Patterns -->
+                        <div id="advancedHeadersDiv" style="display: none;">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-sm font-medium text-gray-700">Header Patterns</span>
+                                <button type="button" onclick="addHeaderPattern()" class="inline-flex items-center px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                    </svg>
+                                    Add Header Pattern
+                                </button>
+                            </div>
+                            <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                <div id="headerPatternsList" class="space-y-3">
+                                    <!-- Dynamic header patterns will be added here -->
+                                </div>
+                                <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <p class="text-xs text-blue-700 mb-2">
+                                        <strong>Header Pattern Examples:</strong>
+                                    </p>
+                                    <ul class="text-xs text-blue-600 space-y-1">
+                                        <li><strong>EXACT:</strong> Header value must match exactly</li>
+                                        <li><strong>REGEX:</strong> Header value must match the regex pattern</li>
+                                        <li><strong>CONTAINS:</strong> Header value must contain the specified text</li>
+                                        <li><strong>EXISTS:</strong> Header must be present (value ignored)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Query Parameters Configuration -->
+                    <div class="mt-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <label class="block text-sm font-medium text-gray-700">Query Parameters Configuration</label>
+                            <div class="flex items-center space-x-4">
+                                <label for="queryParamMatchingMode" class="text-sm font-medium text-gray-700">Mode:</label>
+                                <select id="queryParamMatchingMode" name="queryParamMatchingMode" onchange="toggleQueryParamMatchingFields()"
+                                        class="border border-gray-300 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="simple">Simple (JSON)</option>
+                                    <option value="advanced">Advanced Patterns</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Simple Query Parameters (Backward Compatible) -->
+                        <div id="simpleQueryParamsDiv">
+                            <textarea id="queryParams" name="requestQueryParams" rows="3"
+                                      placeholder='{"active": "true", "limit": "10"}'
+                                      class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                      th:text="${requestQueryParamsJson}"></textarea>
+                            <p class="text-xs text-gray-500 mt-1">JSON format for exact query parameter matching</p>
+                        </div>
+
+                        <!-- Advanced Query Parameters -->
+                        <div id="advancedQueryParamsDiv" style="display: none;">
+                            <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h4 class="text-sm font-medium text-gray-900">Advanced Query Parameter Patterns</h4>
+                                    <button type="button" onclick="addQueryParamPattern()" 
+                                            class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition-colors flex items-center">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                        </svg>
+                                        Add Query Param Pattern
+                                    </button>
+                                </div>
+                                <div id="queryParamPatternsList" class="space-y-3">
+                                    <!-- Dynamic query param patterns will be added here -->
+                                </div>
+                                <textarea id="queryParamPatternsJson" name="queryParamPatternsJson" style="display: none;"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Body Patterns Configuration -->
+                    <div class="mt-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <label class="block text-sm font-medium text-gray-700">Request Body Patterns</label>
+                            <button type="button" onclick="addBodyPattern()" 
+                                    class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition-colors flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Add Body Pattern
+                            </button>
+                        </div>
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <div id="bodyPatternsList" class="space-y-3">
+                                <!-- Dynamic body patterns will be added here -->
+                            </div>
+                            <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p class="text-xs text-blue-700 mb-2">
+                                    <strong>Body Pattern Examples:</strong>
+                                </p>
+                                <p class="text-xs text-blue-600">
+                                    • <strong>JSONPath:</strong> $.user.id for checking user ID in JSON<br>
+                                    • <strong>Regex:</strong> .*error.* for matching any content with "error"<br>
+                                    • <strong>Exact:</strong> Complete body match<br>
+                                    • <strong>Contains:</strong> Partial content match
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -243,6 +401,17 @@
                         <textarea id="conditionalResponsesJson" name="conditionalResponsesJson" style="display: none;"
                                   th:text="${conditionalResponsesJson}"></textarea>
                         
+                        <!-- Hidden inputs for advanced pattern data -->
+                        <input type="hidden" id="pathMatchingModeHidden" th:value="${pathMatchingMode}">
+                        <input type="hidden" id="pathMatchTypeHidden" th:value="${pathMatchType}">
+                        <input type="hidden" id="pathPatternHidden" th:value="${pathPattern}">
+                        <input type="hidden" id="pathIgnoreCaseHidden" th:value="${pathIgnoreCase}">
+                        <input type="hidden" id="headerMatchingModeHidden" th:value="${headerMatchingMode}">
+                        <textarea id="headerPatternsJson" name="headerPatternsJson" style="display: none;" th:utext="${headerPatternsJson}"></textarea>
+                        <input type="hidden" id="queryParamMatchingModeHidden" th:value="${queryParamMatchingMode}">
+                        <textarea id="queryParamPatternsJson" name="queryParamPatternsJson" style="display: none;" th:utext="${queryParamPatternsJson}"></textarea>
+                        <textarea id="bodyPatternsJson" name="bodyPatternsJson" style="display: none;" th:utext="${bodyPatternsJson}"></textarea>
+                        
                         <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                             <p class="text-xs text-blue-700 mb-2">
                                 <strong>How it works:</strong> When a request includes the specified header with a matching Request ID, 
@@ -283,6 +452,12 @@
         </div>
 
         <script>
+            
+            // Counters for dynamic elements
+            let headerPatternCounter = 0;
+            let queryParamPatternCounter = 0;
+            let bodyPatternCounter = 0;
+
             function toggleDelayFields() {
                 const mode = document.getElementById('delayMode').value;
                 const fixedDiv = document.getElementById('fixedDelayDiv');
@@ -296,13 +471,377 @@
                     variableDiv.style.display = 'none';
                 }
             }
+
+            function togglePathMatchingFields() {
+                const mode = document.getElementById('pathMatchingMode').value;
+                const simpleDiv = document.getElementById('simplePathDiv');
+                const advancedDiv = document.getElementById('advancedPathDiv');
+                
+                if (mode === 'advanced') {
+                    simpleDiv.style.display = 'none';
+                    advancedDiv.style.display = 'block';
+                    document.getElementById('path').removeAttribute('required');
+                } else {
+                    simpleDiv.style.display = 'block';
+                    advancedDiv.style.display = 'none';
+                    document.getElementById('path').setAttribute('required', 'required');
+                }
+            }
+
+            function toggleHeaderMatchingFields() {
+                const mode = document.getElementById('headerMatchingMode').value;
+                const simpleDiv = document.getElementById('simpleHeadersDiv');
+                const advancedDiv = document.getElementById('advancedHeadersDiv');
+                
+                if (mode === 'advanced') {
+                    simpleDiv.style.display = 'none';
+                    advancedDiv.style.display = 'block';
+                } else {
+                    simpleDiv.style.display = 'block';
+                    advancedDiv.style.display = 'none';
+                }
+            }
+
+            function toggleQueryParamMatchingFields() {
+                const mode = document.getElementById('queryParamMatchingMode').value;
+                const simpleDiv = document.getElementById('simpleQueryParamsDiv');
+                const advancedDiv = document.getElementById('advancedQueryParamsDiv');
+                
+                if (mode === 'advanced') {
+                    simpleDiv.style.display = 'none';
+                    advancedDiv.style.display = 'block';
+                } else {
+                    simpleDiv.style.display = 'block';
+                    advancedDiv.style.display = 'none';
+                }
+            }
+
+            function addHeaderPattern(name = '', matchType = 'EXACT', pattern = '', ignoreCase = false) {
+                headerPatternCounter++;
+                const patternsList = document.getElementById('headerPatternsList');
+                
+                const patternDiv = document.createElement('div');
+                patternDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                patternDiv.id = `headerPattern-${headerPatternCounter}`;
+                
+                patternDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h5 class="text-sm font-medium text-gray-900">Header Pattern #${headerPatternCounter}</h5>
+                        <button type="button" onclick="removeHeaderPattern('headerPattern-${headerPatternCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Header Name</label>
+                            <input type="text" class="header-pattern-name w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${name}" placeholder="X-Custom-Header" onchange="updateHeaderPatternsJson()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="header-pattern-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    onchange="updateHeaderPatternsJson()">
+                                <option value="EXACT" ${matchType === 'EXACT' ? 'selected' : ''}>Exact</option>
+                                <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                                <option value="EXISTS" ${matchType === 'EXISTS' ? 'selected' : ''}>Exists</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Pattern</label>
+                            <input type="text" class="header-pattern-pattern w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${pattern}" placeholder="Bearer.*" onchange="updateHeaderPatternsJson()">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="header-pattern-ignore-case rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateHeaderPatternsJson()">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                
+                patternsList.appendChild(patternDiv);
+                updateHeaderPatternsJson();
+            }
+
+            function removeHeaderPattern(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                if (patternDiv) {
+                    patternDiv.remove();
+                    updateHeaderPatternsJson();
+                }
+            }
+
+            function updateHeaderPatternsJson() {
+                const patterns = {};
+                const patternDivs = document.querySelectorAll('[id^="headerPattern-"]');
+                
+                patternDivs.forEach(div => {
+                    const name = div.querySelector('.header-pattern-name').value.trim();
+                    const matchType = div.querySelector('.header-pattern-match-type').value;
+                    const pattern = div.querySelector('.header-pattern-pattern').value.trim();
+                    const ignoreCase = div.querySelector('.header-pattern-ignore-case').checked;
+                    
+                    if (name) {
+                        patterns[name] = {
+                            matchType: matchType,
+                            pattern: pattern,
+                            ignoreCase: ignoreCase
+                        };
+                    }
+                });
+                
+                document.getElementById('headerPatternsJson').value = JSON.stringify(patterns);
+            }
+
+            function addQueryParamPattern(name = '', matchType = 'EXACT', pattern = '', ignoreCase = false) {
+                queryParamPatternCounter++;
+                const patternsList = document.getElementById('queryParamPatternsList');
+                
+                const patternDiv = document.createElement('div');
+                patternDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                patternDiv.id = `queryParamPattern-${queryParamPatternCounter}`;
+                
+                patternDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h5 class="text-sm font-medium text-gray-900">Query Param Pattern #${queryParamPatternCounter}</h5>
+                        <button type="button" onclick="removeQueryParamPattern('queryParamPattern-${queryParamPatternCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Parameter Name</label>
+                            <input type="text" class="query-param-pattern-name w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${name}" placeholder="userId" onchange="updateQueryParamPatternsJson()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="query-param-pattern-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    onchange="updateQueryParamPatternsJson()">
+                                <option value="EXACT" ${matchType === 'EXACT' ? 'selected' : ''}>Exact</option>
+                                <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                                <option value="EXISTS" ${matchType === 'EXISTS' ? 'selected' : ''}>Exists</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Pattern</label>
+                            <input type="text" class="query-param-pattern-pattern w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${pattern}" placeholder="\\d+" onchange="updateQueryParamPatternsJson()">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="query-param-pattern-ignore-case rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateQueryParamPatternsJson()">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                
+                patternsList.appendChild(patternDiv);
+                updateQueryParamPatternsJson();
+            }
+
+            function removeQueryParamPattern(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                if (patternDiv) {
+                    patternDiv.remove();
+                    updateQueryParamPatternsJson();
+                }
+            }
+
+            function updateQueryParamPatternsJson() {
+                const patterns = {};
+                const patternDivs = document.querySelectorAll('[id^="queryParamPattern-"]');
+                
+                patternDivs.forEach(div => {
+                    const name = div.querySelector('.query-param-pattern-name').value.trim();
+                    const matchType = div.querySelector('.query-param-pattern-match-type').value;
+                    const pattern = div.querySelector('.query-param-pattern-pattern').value.trim();
+                    const ignoreCase = div.querySelector('.query-param-pattern-ignore-case').checked;
+                    
+                    if (name) {
+                        patterns[name] = {
+                            matchType: matchType,
+                            pattern: pattern,
+                            ignoreCase: ignoreCase
+                        };
+                    }
+                });
+                
+                document.getElementById('queryParamPatternsJson').value = JSON.stringify(patterns);
+            }
+
+            function addBodyPattern(matchType = 'CONTAINS', expr = '', expected = '', ignoreCase = false) {
+                bodyPatternCounter++;
+                const patternsList = document.getElementById('bodyPatternsList');
+                
+                const patternDiv = document.createElement('div');
+                patternDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                patternDiv.id = `bodyPattern-${bodyPatternCounter}`;
+                
+                // Generate description based on pattern
+                const description = generatePatternDescription(matchType, expr, expected);
+                
+                const htmlContent = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div>
+                            <h5 class="text-sm font-medium text-gray-900">Body Pattern #${bodyPatternCounter}</h5>
+                            <p class="text-xs text-blue-600 mt-1 pattern-description">${description}</p>
+                        </div>
+                        <button type="button" onclick="removeBodyPattern('bodyPattern-${bodyPatternCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="body-pattern-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    onchange="updateBodyPatternsJson(); toggleBodyPatternFields('bodyPattern-${bodyPatternCounter}'); updatePatternDescription('bodyPattern-${bodyPatternCounter}')">
+                                <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                                <option value="JSONPATH" ${matchType === 'JSONPATH' ? 'selected' : ''}>JSONPath</option>
+                                <option value="XPATH" ${matchType === 'XPATH' ? 'selected' : ''}>XPath</option>
+                            </select>
+                        </div>
+                        <div class="body-pattern-expr-field" style="display: ${matchType === 'JSONPATH' || matchType === 'XPATH' ? 'block' : 'none'};">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Expression</label>
+                            <input type="text" class="body-pattern-expr w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${expr}" placeholder="$.user.id" onchange="updateBodyPatternsJson(); updatePatternDescription('bodyPattern-${bodyPatternCounter}')">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Expected Value</label>
+                            <input type="text" class="body-pattern-expected w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${expected}" placeholder="123" onchange="updateBodyPatternsJson(); updatePatternDescription('bodyPattern-${bodyPatternCounter}')">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="body-pattern-ignore-case rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateBodyPatternsJson()">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                
+                patternDiv.innerHTML = htmlContent;
+                
+                if (patternsList) {
+                    patternsList.appendChild(patternDiv);
+                }
+                
+                updateBodyPatternsJson();
+            }
+
+            function removeBodyPattern(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                if (patternDiv) {
+                    patternDiv.remove();
+                    updateBodyPatternsJson();
+                }
+            }
+
+            function toggleBodyPatternFields(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                const matchType = patternDiv.querySelector('.body-pattern-match-type').value;
+                const exprField = patternDiv.querySelector('.body-pattern-expr-field');
+                
+                if (matchType === 'JSONPATH' || matchType === 'XPATH') {
+                    exprField.style.display = 'block';
+                } else {
+                    exprField.style.display = 'none';
+                }
+            }
+
+            function updateBodyPatternsJson() {
+                const patterns = [];
+                const patternDivs = document.querySelectorAll('[id^="bodyPattern-"]');
+                
+                patternDivs.forEach(div => {
+                    const matchType = div.querySelector('.body-pattern-match-type').value;
+                    const expr = div.querySelector('.body-pattern-expr').value.trim();
+                    const expected = div.querySelector('.body-pattern-expected').value.trim();
+                    const ignoreCase = div.querySelector('.body-pattern-ignore-case').checked;
+                    
+                    patterns.push({
+                        matchType: matchType,
+                        expr: expr,
+                        expected: expected,
+                        ignoreCase: ignoreCase
+                    });
+                });
+                
+                document.getElementById('bodyPatternsJson').value = JSON.stringify(patterns);
+            }
             
             // Initialize on page load
             document.addEventListener('DOMContentLoaded', function() {
                 toggleDelayFields();
                 toggleConditionalResponses();
                 loadExistingConditionalMappings();
+                
+                // Initialize advanced pattern form values from hidden inputs
+                initializeAdvancedPatternForms();
+                
+                togglePathMatchingFields();
+                toggleHeaderMatchingFields();
+                toggleQueryParamMatchingFields();
+                loadExistingHeaderPatterns();
+                loadExistingQueryParamPatterns();
+                loadExistingBodyPatterns();
+                
+                // Test removed - no longer needed
             });
+            
+            function initializeAdvancedPatternForms() {
+                // Set path matching form values
+                const pathMatchingMode = document.getElementById('pathMatchingModeHidden')?.value || 'simple';
+                const pathMatchingRadio = document.querySelector(`input[name="pathMatchingMode"][value="${pathMatchingMode}"]`);
+                if (pathMatchingRadio) {
+                    pathMatchingRadio.checked = true;
+                }
+                
+                if (pathMatchingMode === 'advanced') {
+                    const pathMatchType = document.getElementById('pathMatchTypeHidden')?.value || 'EXACT';
+                    const pathPattern = document.getElementById('pathPatternHidden')?.value || '';
+                    const pathIgnoreCase = document.getElementById('pathIgnoreCaseHidden')?.value === 'true';
+                    
+                    const pathMatchTypeSelect = document.getElementById('pathMatchType');
+                    const pathPatternInput = document.getElementById('pathPattern');
+                    const pathIgnoreCaseInput = document.getElementById('pathIgnoreCase');
+                    
+                    if (pathMatchTypeSelect) pathMatchTypeSelect.value = pathMatchType;
+                    if (pathPatternInput) pathPatternInput.value = pathPattern;
+                    if (pathIgnoreCaseInput) pathIgnoreCaseInput.checked = pathIgnoreCase;
+                }
+                
+                // Set header matching form values
+                const headerMatchingMode = document.getElementById('headerMatchingModeHidden')?.value || 'simple';
+                const headerMatchingRadio = document.querySelector(`input[name="headerMatchingMode"][value="${headerMatchingMode}"]`);
+                if (headerMatchingRadio) {
+                    headerMatchingRadio.checked = true;
+                }
+                
+                // Set query param matching form values
+                const queryParamMatchingMode = document.getElementById('queryParamMatchingModeHidden')?.value || 'simple';
+                const queryParamMatchingRadio = document.querySelector(`input[name="queryParamMatchingMode"][value="${queryParamMatchingMode}"]`);
+                if (queryParamMatchingRadio) {
+                    queryParamMatchingRadio.checked = true;
+                }
+            }
 
             function toggleConditionalResponses() {
                 const enabled = document.getElementById('conditionalResponsesEnabled').checked;
@@ -434,6 +973,152 @@
                         });
                     } catch (e) {
                         console.warn('Failed to parse existing conditional responses:', e);
+                    }
+                }
+            }
+            
+            // Load existing header patterns when page loads
+            function loadExistingHeaderPatterns() {
+                const jsonTextarea = document.getElementById('headerPatternsJson');
+                if (jsonTextarea && jsonTextarea.value.trim() && jsonTextarea.value !== '{}') {
+                    try {
+                        const patterns = JSON.parse(jsonTextarea.value);
+                        Object.keys(patterns).forEach(name => {
+                            const pattern = patterns[name];
+                            addHeaderPattern(
+                                name,
+                                pattern.matchType || 'EXACT',
+                                pattern.pattern || '',
+                                pattern.ignoreCase || false
+                            );
+                        });
+                    } catch (e) {
+                        console.warn('Failed to parse existing header patterns:', e);
+                    }
+                }
+            }
+            
+            // Load existing query param patterns when page loads
+            function loadExistingQueryParamPatterns() {
+                const jsonTextarea = document.getElementById('queryParamPatternsJson');
+                if (jsonTextarea && jsonTextarea.value.trim() && jsonTextarea.value !== '{}') {
+                    try {
+                        const patterns = JSON.parse(jsonTextarea.value);
+                        Object.keys(patterns).forEach(name => {
+                            const pattern = patterns[name];
+                            addQueryParamPattern(
+                                name,
+                                pattern.matchType || 'EXACT',
+                                pattern.pattern || '',
+                                pattern.ignoreCase || false
+                            );
+                        });
+                    } catch (e) {
+                        console.warn('Failed to parse existing query param patterns:', e);
+                    }
+                }
+            }
+            
+            // Helper function to decode HTML entities
+            function decodeHtmlEntities(text) {
+                try {
+                    // Direct approach - remove the excessive escaping step by step
+                    let decoded = text;
+                    
+                    // Remove HTML entity encoding
+                    decoded = decoded.replace(/&quot;/g, '"');
+                    decoded = decoded.replace(/&lt;/g, '<');
+                    decoded = decoded.replace(/&gt;/g, '>');
+                    decoded = decoded.replace(/&amp;/g, '&');
+                    
+                    return decoded;
+                } catch (e) {
+                    console.error('Error in decodeHtmlEntities:', e);
+                    return text;
+                }
+            }
+            
+            // Generate human-readable description for body patterns
+            function generatePatternDescription(matchType, expr, expected) {
+                if (!expected || expected.trim() === '') {
+                    return 'Pattern not configured';
+                }
+                
+                switch(matchType) {
+                    case 'CONTAINS':
+                        return 'Request body must contain: "' + expected + '"';
+                    case 'JSONPATH':
+                        return 'JSON field "' + expr + '" must equal: "' + expected + '"';
+                    case 'XPATH':
+                        return 'XML element "' + expr + '" must equal: "' + expected + '"';
+                    case 'REGEX':
+                        // Try to provide more specific descriptions for common patterns
+                        if (expected.indexOf('account_number') !== -1) {
+                            if (expected.indexOf('(?!.*') !== -1) {
+                                return 'Request must NOT contain account_number field';
+                            } else if (expected.indexOf('(?!\\d{7,10}$)') !== -1) {
+                                return 'account_number must NOT be 7-10 digits (invalid format)';
+                            } else if (expected.indexOf('\\d{7,10}') !== -1) {
+                                return 'account_number must be 7-10 digits';
+                            } else {
+                                return 'account_number field validation';
+                            }
+                        } else if (expected.indexOf('routing_number') !== -1) {
+                            if (expected.indexOf('(?!.*') !== -1) {
+                                return 'Request must NOT contain routing_number field';
+                            } else if (expected.indexOf('(?!\\d{9}$)') !== -1) {
+                                return 'routing_number must NOT be exactly 9 digits (invalid format)';
+                            } else if (expected.indexOf('\\d{9}') !== -1) {
+                                return 'routing_number must be exactly 9 digits';
+                            } else if (expected.indexOf('021000021|111000025|999999999') !== -1) {
+                                return 'routing_number must be one of blocked numbers';
+                            } else {
+                                return 'routing_number field validation';
+                            }
+                        } else {
+                            return 'Request body must match regex: ' + expected.substring(0, 50) + (expected.length > 50 ? '...' : '');
+                        }
+                    default:
+                        return 'Pattern: ' + expected;
+                }
+            }
+            
+            // Update pattern description when values change
+            function updatePatternDescription(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                if (!patternDiv) return;
+                
+                const matchType = patternDiv.querySelector('.body-pattern-match-type').value;
+                const expr = patternDiv.querySelector('.body-pattern-expr')?.value || '';
+                const expected = patternDiv.querySelector('.body-pattern-expected').value;
+                
+                const description = generatePatternDescription(matchType, expr, expected);
+                const descriptionElement = patternDiv.querySelector('.pattern-description');
+                if (descriptionElement) {
+                    descriptionElement.textContent = description;
+                }
+            }
+            
+            // Load existing body patterns when page loads
+            function loadExistingBodyPatterns() {
+                const jsonTextarea = document.getElementById('bodyPatternsJson');
+                
+                if (jsonTextarea && jsonTextarea.value.trim() && jsonTextarea.value !== '[]') {
+                    try {
+                        // Decode HTML entities before parsing JSON
+                        const decodedValue = decodeHtmlEntities(jsonTextarea.value);
+                        const patterns = JSON.parse(decodedValue);
+                        
+                        patterns.forEach((pattern) => {
+                            addBodyPattern(
+                                pattern.matchType || 'EXACT',
+                                pattern.expr || '',
+                                pattern.expected || '',
+                                pattern.ignoreCase || false
+                            );
+                        });
+                    } catch (e) {
+                        console.warn('Failed to parse existing body patterns:', e);
                     }
                 }
             }
