@@ -9,17 +9,20 @@
             <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
                 <h1 class="text-2xl font-bold text-gray-900 mb-4 md:mb-0">API Mappings Dashboard</h1>
                 <div class="flex flex-col md:flex-row gap-4">
-                    <form class="flex" hx-get="/" hx-target="main" hx-trigger="input changed delay:500ms from:#search, submit">
+                    <form class="flex" hx-get="/" hx-target="main" hx-trigger="input changed delay:500ms from:#search, submit, change from:#nameFilter">
                         <input 
                             id="search"
                             name="search" 
                             type="text" 
-                            placeholder="Search mappings..."
+                            placeholder="Search by path, method..."
                             th:value="${search}"
                             class="border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-r-lg hover:bg-blue-600 transition-colors">
                             Search
                         </button>
+                        <!-- Hidden inputs to preserve sort parameters -->
+                        <input type="hidden" name="sortBy" th:value="${sortBy}">
+                        <input type="hidden" name="sortDir" th:value="${sortDir}">
                     </form>
                     <a th:href="@{/mappings/new}" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors text-center">
                         New Mapping
@@ -27,15 +30,112 @@
                 </div>
             </div>
 
+            <!-- Advanced Filters and Sorting -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6 border">
+                <div class="flex flex-col md:flex-row md:items-center gap-4">
+                    <div class="flex-1">
+                        <label for="nameFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Name</label>
+                        <form hx-get="/" hx-target="main" hx-trigger="input changed delay:300ms from:#nameFilter">
+                            <input 
+                                id="nameFilter"
+                                name="search" 
+                                type="text" 
+                                placeholder="Type to filter by mapping name..."
+                                th:value="${search}"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <!-- Hidden inputs to preserve sort parameters -->
+                            <input type="hidden" name="sortBy" th:value="${sortBy}">
+                            <input type="hidden" name="sortDir" th:value="${sortDir}">
+                        </form>
+                    </div>
+                    
+                    <div class="flex-shrink-0">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                        <form class="flex gap-2" hx-get="/" hx-target="main" hx-trigger="change">
+                            <select name="sortBy" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="name" th:selected="${sortBy == 'name'}">Name</option>
+                                <option value="priority" th:selected="${sortBy == 'priority'}">Priority</option>
+                                <option value="method" th:selected="${sortBy == 'method'}">Method</option>
+                                <option value="path" th:selected="${sortBy == 'path'}">Path</option>
+                            </select>
+                            <select name="sortDir" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="asc" th:selected="${sortDir == 'asc'}">↑ Ascending</option>
+                                <option value="desc" th:selected="${sortDir == 'desc'}">↓ Descending</option>
+                            </select>
+                            <!-- Preserve search parameter -->
+                            <input type="hidden" name="search" th:value="${search}">
+                        </form>
+                    </div>
+                    
+                    <div class="flex-shrink-0">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
+                        <a href="/" class="inline-block bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-300 transition-colors">
+                            Reset Filters
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Filters and Sort Status -->
+            <div th:if="${search != null && !search.isEmpty()} or ${sortBy != 'name'} or ${sortDir != 'asc'}" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="flex flex-wrap items-center gap-2 text-sm">
+                    <span class="font-medium text-blue-800">Active filters:</span>
+                    <span th:if="${search != null && !search.isEmpty()}" class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-md">
+                        <span>Search: "<span th:text="${search}"></span>"</span>
+                        <a th:href="@{'/?sortBy=' + ${sortBy} + '&sortDir=' + ${sortDir}}" class="ml-1 text-blue-600 hover:text-blue-800">×</a>
+                    </span>
+                    <span th:if="${sortBy != 'name'} or ${sortDir != 'asc'}" class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-md">
+                        <span>Sort: <span th:text="${sortBy}"></span> <span th:text="${sortDir == 'asc' ? '↑' : '↓'}"></span></span>
+                        <a th:href="@{'/' + (${search} ? '?search=' + ${search} : '')}" class="ml-1 text-blue-600 hover:text-blue-800">×</a>
+                    </span>
+                </div>
+            </div>
+
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Path</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <a th:href="@{'/?sortBy=name&sortDir=' + (${sortBy == 'name' && sortDir == 'asc'} ? 'desc' : 'asc') + (${search} ? '&search=' + ${search} : '')}" 
+                                   class="flex items-center space-x-1 hover:text-gray-700">
+                                    <span>Name</span>
+                                    <span th:if="${sortBy == 'name'}" class="text-blue-500">
+                                        <span th:if="${sortDir == 'asc'}">↑</span>
+                                        <span th:if="${sortDir == 'desc'}">↓</span>
+                                    </span>
+                                </a>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <a th:href="@{'/?sortBy=method&sortDir=' + (${sortBy == 'method' && sortDir == 'asc'} ? 'desc' : 'asc') + (${search} ? '&search=' + ${search} : '')}" 
+                                   class="flex items-center space-x-1 hover:text-gray-700">
+                                    <span>Method</span>
+                                    <span th:if="${sortBy == 'method'}" class="text-blue-500">
+                                        <span th:if="${sortDir == 'asc'}">↑</span>
+                                        <span th:if="${sortDir == 'desc'}">↓</span>
+                                    </span>
+                                </a>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <a th:href="@{'/?sortBy=path&sortDir=' + (${sortBy == 'path' && sortDir == 'asc'} ? 'desc' : 'asc') + (${search} ? '&search=' + ${search} : '')}" 
+                                   class="flex items-center space-x-1 hover:text-gray-700">
+                                    <span>Path</span>
+                                    <span th:if="${sortBy == 'path'}" class="text-blue-500">
+                                        <span th:if="${sortDir == 'asc'}">↑</span>
+                                        <span th:if="${sortDir == 'desc'}">↓</span>
+                                    </span>
+                                </a>
+                            </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <a th:href="@{'/?sortBy=priority&sortDir=' + (${sortBy == 'priority' && sortDir == 'asc'} ? 'desc' : 'asc') + (${search} ? '&search=' + ${search} : '')}" 
+                                   class="flex items-center space-x-1 hover:text-gray-700">
+                                    <span>Priority</span>
+                                    <span th:if="${sortBy == 'priority'}" class="text-blue-500">
+                                        <span th:if="${sortDir == 'asc'}">↑</span>
+                                        <span th:if="${sortDir == 'desc'}">↓</span>
+                                    </span>
+                                </a>
+                            </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -102,7 +202,7 @@
                 </div>
                 <div class="flex items-center space-x-2">
                     <a th:if="${currentPage > 0}" 
-                       th:href="@{'/?page=' + ${currentPage - 1} + (${search} ? '&search=' + ${search} : '')}"
+                       th:href="@{'/?page=' + ${currentPage - 1} + (${search} ? '&search=' + ${search} : '') + '&sortBy=' + ${sortBy} + '&sortDir=' + ${sortDir}}"
                        class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50">
                         Previous
                     </a>
@@ -110,7 +210,7 @@
                     <span th:each="i : ${#numbers.sequence(0, totalPages - 1)}" 
                           th:if="${i >= currentPage - 2 && i <= currentPage + 2}">
                         <a th:if="${i != currentPage}"
-                           th:href="@{'/?page=' + ${i} + (${search} ? '&search=' + ${search} : '')}"
+                           th:href="@{'/?page=' + ${i} + (${search} ? '&search=' + ${search} : '') + '&sortBy=' + ${sortBy} + '&sortDir=' + ${sortDir}}"
                            th:text="${i + 1}"
                            class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50"></a>
                         <span th:if="${i == currentPage}"
@@ -119,7 +219,7 @@
                     </span>
                     
                     <a th:if="${currentPage < totalPages - 1}" 
-                       th:href="@{'/?page=' + ${currentPage + 1} + (${search} ? '&search=' + ${search} : '')}"
+                       th:href="@{'/?page=' + ${currentPage + 1} + (${search} ? '&search=' + ${search} : '') + '&sortBy=' + ${sortBy} + '&sortDir=' + ${sortDir}}"
                        class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50">
                         Next
                     </a>

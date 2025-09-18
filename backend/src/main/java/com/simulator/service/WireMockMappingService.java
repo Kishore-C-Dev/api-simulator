@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class WireMockMappingService {
@@ -85,16 +86,7 @@ public class WireMockMappingService {
         MappingBuilder builder;
         
         String method = request.getMethod().toUpperCase();
-        UrlPattern urlPattern;
-        
-        if (request.getPath().contains("{") || request.getPath().contains("*")) {
-            String regex = request.getPath()
-                .replaceAll("\\{[^}]*\\}", "[^/]+")
-                .replaceAll("\\*", ".*");
-            urlPattern = WireMock.urlMatching(regex);
-        } else {
-            urlPattern = WireMock.urlEqualTo(request.getPath());
-        }
+        UrlPattern urlPattern = buildUrlPattern(request);
 
         switch (method) {
             case "GET":
@@ -116,15 +108,31 @@ public class WireMockMappingService {
                 builder = WireMock.any(urlPattern);
         }
 
+        // Add header patterns (backward compatible)
         if (request.getHeaders() != null) {
             for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
                 builder = builder.withHeader(header.getKey(), WireMock.equalTo(header.getValue()));
             }
         }
 
+        // Add advanced header patterns
+        if (request.getHeaderPatterns() != null) {
+            for (Map.Entry<String, RequestMapping.ParameterPattern> entry : request.getHeaderPatterns().entrySet()) {
+                builder = addHeaderPattern(builder, entry.getKey(), entry.getValue());
+            }
+        }
+
+        // Add query parameter patterns (backward compatible)
         if (request.getQueryParams() != null) {
             for (Map.Entry<String, String> param : request.getQueryParams().entrySet()) {
                 builder = builder.withQueryParam(param.getKey(), WireMock.equalTo(param.getValue()));
+            }
+        }
+
+        // Add advanced query parameter patterns
+        if (request.getQueryParamPatterns() != null) {
+            for (Map.Entry<String, RequestMapping.ParameterPattern> entry : request.getQueryParamPatterns().entrySet()) {
+                builder = addQueryParamPattern(builder, entry.getKey(), entry.getValue());
             }
         }
 
@@ -137,15 +145,169 @@ public class WireMockMappingService {
         return builder;
     }
 
-    private MappingBuilder addBodyPattern(MappingBuilder builder, RequestMapping.BodyPattern pattern) {
-        if ("jsonPath".equals(pattern.getMatcher())) {
-            return builder.withRequestBody(WireMock.matchingJsonPath(pattern.getExpr(), WireMock.equalTo(pattern.getExpected())));
-        } else if ("regex".equals(pattern.getMatcher())) {
-            return builder.withRequestBody(WireMock.matching(pattern.getExpr()));
-        } else if ("equalTo".equals(pattern.getMatcher())) {
-            return builder.withRequestBody(WireMock.equalTo(pattern.getExpected()));
+    private UrlPattern buildUrlPattern(RequestMapping.RequestSpec request) {
+        // Check if advanced path pattern is specified
+        if (request.getPathPattern() != null) {
+            return buildAdvancedUrlPattern(request.getPathPattern());
         }
-        return builder;
+
+        // Fallback to legacy path handling
+        if (request.getPath() != null) {
+            if (request.getPath().contains("{") || request.getPath().contains("*")) {
+                String regex = request.getPath()
+                    .replaceAll("\\{[^}]*\\}", "[^/]+")
+                    .replaceAll("\\*", ".*");
+                return WireMock.urlMatching(regex);
+            } else {
+                return WireMock.urlEqualTo(request.getPath());
+            }
+        }
+
+        return WireMock.urlMatching(".*"); // Match all if no path specified
+    }
+
+    private UrlPattern buildAdvancedUrlPattern(RequestMapping.PathPattern pathPattern) {
+        String pattern = pathPattern.getPattern();
+        if (pattern == null || pattern.trim().isEmpty()) {
+            return WireMock.urlMatching(".*");
+        }
+
+        switch (pathPattern.getMatchType()) {
+            case EXACT:
+                return WireMock.urlEqualTo(pattern);
+                
+            case WILDCARD:
+                String regexPattern = pattern
+                    .replace(".", "\\.")
+                    .replace("*", ".*")
+                    .replace("?", ".?");
+                return pathPattern.isIgnoreCase() ? 
+                    WireMock.urlMatching("(?i)" + regexPattern) : 
+                    WireMock.urlMatching(regexPattern);
+                    
+            case REGEX:
+                return pathPattern.isIgnoreCase() ? 
+                    WireMock.urlMatching("(?i)" + pattern) : 
+                    WireMock.urlMatching(pattern);
+                    
+            default:
+                return WireMock.urlEqualTo(pattern);
+        }
+    }
+
+    private MappingBuilder addHeaderPattern(MappingBuilder builder, String headerName, RequestMapping.ParameterPattern pattern) {
+        switch (pattern.getMatchType()) {
+            case EXISTS:
+                return builder.withHeader(headerName, WireMock.matching(".*"));
+                
+            case EXACT:
+                return pattern.isIgnoreCase() ?
+                    builder.withHeader(headerName, WireMock.equalToIgnoreCase(pattern.getPattern())) :
+                    builder.withHeader(headerName, WireMock.equalTo(pattern.getPattern()));
+                    
+            case CONTAINS:
+                return pattern.isIgnoreCase() ?
+                    builder.withHeader(headerName, WireMock.matching("(?i).*" + Pattern.quote(pattern.getPattern()) + ".*")) :
+                    builder.withHeader(headerName, WireMock.containing(pattern.getPattern()));
+                    
+            case REGEX:
+                String regexPattern = pattern.isIgnoreCase() ? 
+                    "(?i)" + pattern.getPattern() : pattern.getPattern();
+                return builder.withHeader(headerName, WireMock.matching(regexPattern));
+                
+            default:
+                return builder.withHeader(headerName, WireMock.equalTo(pattern.getPattern()));
+        }
+    }
+
+    private MappingBuilder addQueryParamPattern(MappingBuilder builder, String paramName, RequestMapping.ParameterPattern pattern) {
+        switch (pattern.getMatchType()) {
+            case EXISTS:
+                return builder.withQueryParam(paramName, WireMock.matching(".*"));
+                
+            case EXACT:
+                return pattern.isIgnoreCase() ?
+                    builder.withQueryParam(paramName, WireMock.equalToIgnoreCase(pattern.getPattern())) :
+                    builder.withQueryParam(paramName, WireMock.equalTo(pattern.getPattern()));
+                    
+            case CONTAINS:
+                return pattern.isIgnoreCase() ?
+                    builder.withQueryParam(paramName, WireMock.matching("(?i).*" + Pattern.quote(pattern.getPattern()) + ".*")) :
+                    builder.withQueryParam(paramName, WireMock.containing(pattern.getPattern()));
+                    
+            case REGEX:
+                String regexPattern = pattern.isIgnoreCase() ? 
+                    "(?i)" + pattern.getPattern() : pattern.getPattern();
+                return builder.withQueryParam(paramName, WireMock.matching(regexPattern));
+                
+            default:
+                return builder.withQueryParam(paramName, WireMock.equalTo(pattern.getPattern()));
+        }
+    }
+
+    private MappingBuilder addBodyPattern(MappingBuilder builder, RequestMapping.BodyPattern pattern) {
+        // Support both old matcher string and new MatchType enum
+        RequestMapping.BodyPattern.MatchType matchType = pattern.getMatchType();
+        
+        // Backward compatibility: if matchType is null, try to infer from matcher string
+        if (matchType == null && pattern.getMatcher() != null) {
+            switch (pattern.getMatcher().toLowerCase()) {
+                case "jsonpath":
+                    matchType = RequestMapping.BodyPattern.MatchType.JSONPATH;
+                    break;
+                case "regex":
+                    matchType = RequestMapping.BodyPattern.MatchType.REGEX;
+                    break;
+                case "equalto":
+                case "exact":
+                    matchType = RequestMapping.BodyPattern.MatchType.EXACT;
+                    break;
+                case "contains":
+                    matchType = RequestMapping.BodyPattern.MatchType.CONTAINS;
+                    break;
+                default:
+                    matchType = RequestMapping.BodyPattern.MatchType.EXACT;
+            }
+        }
+        
+        if (matchType == null) {
+            return builder;
+        }
+
+        switch (matchType) {
+            case JSONPATH:
+                if (pattern.getExpected() != null && !pattern.getExpected().isEmpty()) {
+                    return builder.withRequestBody(WireMock.matchingJsonPath(pattern.getExpr(), WireMock.equalTo(pattern.getExpected())));
+                } else {
+                    return builder.withRequestBody(WireMock.matchingJsonPath(pattern.getExpr()));
+                }
+                
+            case REGEX:
+                String regexPattern = pattern.isIgnoreCase() ? 
+                    "(?i)" + pattern.getExpected() : pattern.getExpected();
+                return builder.withRequestBody(WireMock.matching(regexPattern));
+                
+            case EXACT:
+                return pattern.isIgnoreCase() ?
+                    builder.withRequestBody(WireMock.equalToIgnoreCase(pattern.getExpected())) :
+                    builder.withRequestBody(WireMock.equalTo(pattern.getExpected()));
+                    
+            case CONTAINS:
+                return pattern.isIgnoreCase() ?
+                    builder.withRequestBody(WireMock.matching("(?i).*" + Pattern.quote(pattern.getExpected()) + ".*")) :
+                    builder.withRequestBody(WireMock.containing(pattern.getExpected()));
+                    
+            case XPATH:
+                // WireMock supports XPath matching
+                if (pattern.getExpected() != null && !pattern.getExpected().isEmpty()) {
+                    return builder.withRequestBody(WireMock.matchingXPath(pattern.getExpr(), WireMock.equalTo(pattern.getExpected())));
+                } else {
+                    return builder.withRequestBody(WireMock.matchingXPath(pattern.getExpr()));
+                }
+                
+            default:
+                return builder;
+        }
     }
 
     private ResponseDefinitionBuilder buildResponse(RequestMapping mapping) {

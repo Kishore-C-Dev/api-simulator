@@ -8,7 +8,9 @@ A WireMock-backed API simulator with a modern web interface built using Spring B
 - **MongoDB Persistence**: All mappings and configurations stored in MongoDB
 - **Modern Web UI**: htmx + TailwindCSS for responsive, interactive interface
 - **JSON-Only Responses**: Focused on JSON API simulation (no binary/Base64)
-- **Advanced Matching**: Path patterns, regex, headers, query params, JSONPath
+- **Unified Request Builder**: Single interface for all request matching conditions
+- **Advanced Pattern Matching**: JSONPath, XPath, regex, headers, query params, body patterns
+- **Priority-Based Routing**: Multiple endpoints with configurable priority order
 - **Delay Simulation**: Fixed or variable delays with jitter
 - **Chaos Engineering**: Configurable error rates with alternate error responses
 - **Handlebars Templating**: Dynamic response generation with request data
@@ -59,7 +61,7 @@ A WireMock-backed API simulator with a modern web interface built using Spring B
 
 ## 🎯 Default Seed Mappings
 
-The application comes with three pre-configured endpoints for immediate testing:
+The application comes with five pre-configured endpoints demonstrating various features:
 
 ### 1. Hello World Endpoint
 - **Method**: GET
@@ -89,6 +91,28 @@ The application comes with three pre-configured endpoints for immediate testing:
 - **Error Rate**: 15% (returns 500)
 - **Delay**: Fixed 300ms
 
+### 4. Memo Endpoint - Account Validation (Priority: 1)
+- **Method**: POST
+- **Path**: `/api/memo`
+- **Condition**: JSONPath validation for `account_number = "1234567890"`
+- **Headers**: Requires `Content-Type: application/json`
+- **Response**: Success message with account number
+- **Status**: 200
+
+### 5. Memo Endpoint - Missing Routing Number (Priority: 2)  
+- **Method**: POST
+- **Path**: `/api/memo`
+- **Condition**: Regex pattern `^(?!.*routing_number).*$` (requests without routing_number)
+- **Response**: Error message for missing routing number
+- **Status**: 400
+
+### 6. Memo Endpoint - Default Error (Priority: 5)
+- **Method**: POST
+- **Path**: `/api/memo`  
+- **Condition**: Catch-all for other invalid requests
+- **Response**: Generic error for invalid requests
+- **Status**: 400
+
 **Test these endpoints**:
 ```bash
 # Test hello endpoint
@@ -101,6 +125,21 @@ curl -X POST http://localhost:9999/orders \
 
 # Test flaky endpoint (run multiple times)
 curl http://localhost:9999/flaky
+
+# Test memo with valid account number
+curl -X POST http://localhost:9999/api/memo \
+  -H "Content-Type: application/json" \
+  -d '{"account_number": "1234567890", "amount": 100}'
+
+# Test memo missing routing number (triggers 400 error)
+curl -X POST http://localhost:9999/api/memo \
+  -H "Content-Type: application/json" \
+  -d '{"account_number": "1234567890", "amount": 100}'
+
+# Test memo with invalid data (triggers default error)
+curl -X POST http://localhost:9999/api/memo \
+  -H "Content-Type: application/json" \
+  -d '{"invalid": "data"}'
 ```
 
 ## 🖥️ Web Interface
@@ -112,10 +151,15 @@ curl http://localhost:9999/flaky
 - Priority-based sorting
 
 ### Create/Edit Mapping Form
-- **Request Configuration**: Method, path, headers, query params, body patterns
-- **Response Configuration**: Status, headers, JSON body with templating
-- **Delay Settings**: Fixed or variable delays
-- **Chaos Engineering**: Error rate percentage and alternate error responses
+- **Unified Request Builder**: Single interface for all request matching conditions
+  - Body Patterns (JSONPath, XPath, Regex, Contains, Exact)
+  - Header Patterns (Exact, Regex, Contains, Exists)
+  - Query Parameters (Exact, Regex, Contains, Exists)
+  - Path Patterns (Exact, Wildcard, Regex)
+- **Priority-Based Routing**: Configure endpoint priority (1-10, lower = higher priority)
+- **Response Configuration**: Status, headers, JSON body with Handlebars templating
+- **Delay Settings**: Fixed or variable delays with chaos engineering
+- **Conditional Responses**: Request ID-based response variants
 
 ### Test Panel
 - Built-in JSON echo endpoint for testing
@@ -158,7 +202,38 @@ All configured mappings are available on port `9999`. For example:
 
 ## 📝 Mapping Configuration
 
-### Request Matching
+### Unified Request Conditions
+
+The new unified request builder consolidates all request matching into a single, intuitive interface:
+
+**Body Patterns:**
+- **JSONPath**: `$.account_number` equals `"1234567890"`
+- **Regex**: `^(?!.*routing_number).*$` (negative matching for missing fields)
+- **Contains**: Text substring matching
+- **Exact**: Exact string matching
+- **XPath**: XML path expressions
+
+**Header Patterns:**
+- **Exact**: `Content-Type` equals `application/json`
+- **Contains**: `User-Agent` contains `mobile`
+- **Regex**: `Authorization` matches `Bearer .*`
+- **Exists**: Header must be present
+
+**Query Parameters:**
+- **Exact**: `status` equals `active`
+- **Contains**: `search` contains `product`
+- **Regex**: `id` matches `\d+`
+- **Exists**: Parameter must be present
+
+**Priority-Based Routing:**
+Multiple endpoints can share the same path with different conditions:
+```
+Priority 1: /api/memo + account_number=1234567890 → Success (200)
+Priority 2: /api/memo + no routing_number → Error (400) 
+Priority 5: /api/memo + any other request → Default Error (400)
+```
+
+### Legacy JSON Configuration
 
 ```json
 {
@@ -174,7 +249,7 @@ All configured mappings are available on port `9999`. For example:
     },
     "bodyPatterns": [
       {
-        "matcher": "jsonPath",
+        "matchType": "JSONPATH",
         "expr": "$.type",
         "expected": "premium"
       }
@@ -303,15 +378,43 @@ Create ConfigMaps and Deployments for:
    ```
    Solution: Check application logs for mapping errors
    Action: Use "Refresh WireMock" button in UI
+   API: POST /admin/mappings/refresh
    ```
 
-3. **Port Conflicts**
+3. **WireMock Admin Shows No Objects**
    ```
-   Solution: Modify ports in docker-compose.yml
+   Solution: Mappings need to be manually loaded on startup
+   Action: Use "Refresh WireMock" button or restart application
+   Check: http://localhost:9999/__admin/mappings
+   ```
+
+4. **Port Conflicts**
+   ```
+   Solution: Modify ports in docker-compose.yml or application.yml
    Defaults: 8080 (app), 9999 (wiremock), 27017 (mongo)
    ```
 
-4. **Template Rendering Issues**
+5. **Unified Conditions Not Loading**
+   ```
+   Solution: Check browser console for JavaScript errors
+   Action: Reload page, verify conditions display in Request Conditions section
+   ```
+
+6. **Priority-Based Routing Issues**
+   ```
+   Solution: Lower priority number = higher precedence
+   Example: Priority 1 matches before Priority 5
+   Check: WireMock processes by priority order
+   ```
+
+7. **Regex Patterns Not Working**
+   ```
+   Solution: Test regex patterns in unified interface text area
+   Example: ^(?!.*routing_number).*$ for negative matching
+   Tool: Use online regex testers for validation
+   ```
+
+8. **Template Rendering Issues**
    ```
    Solution: Verify Handlebars syntax in response bodies
    Check: Enable templating checkbox for dynamic responses
@@ -332,13 +435,17 @@ Create ConfigMaps and Deployments for:
 ## 🔮 Future Enhancements
 
 - [ ] Dataset switching and management UI
-- [ ] User authentication and authorization
+- [ ] User authentication and authorization  
 - [ ] API usage analytics and metrics
 - [ ] OpenAPI/Swagger spec import
 - [ ] GraphQL endpoint simulation
 - [ ] Webhook simulation capabilities
 - [ ] Request/response transformation pipelines
 - [ ] A/B testing support with multiple response variants
+- [ ] Condition validation with real-time testing
+- [ ] Template editor with syntax highlighting
+- [ ] Bulk condition operations (copy, move, delete)
+- [ ] Advanced regex builder with pattern suggestions
 
 ## 📄 License
 
