@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Regex Pattern Editing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-8">
+    <h1 class="text-2xl font-bold mb-4">Test Regex Pattern Editing</h1>
+    
+    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+        <div id="conditionsList" class="space-y-3">
+            <!-- Dynamic conditions will be added here -->
+        </div>
+    </div>
+    
+    <!-- Hidden textarea with the actual pattern -->
+    <textarea id="bodyPatternsJson" style="display: none;">[{"matchType":"REGEX","expr":"","expected":"^(?!.*\"routing_number\").*$","ignoreCase":false,"matcher":"regex"}]</textarea>
+    
+    <script>
+        let bodyPatternCounter = 0;
+        
+        function decodeHtmlEntities(text) {
+            try {
+                let decoded = text;
+                decoded = decoded.replace(/&quot;/g, '"');
+                decoded = decoded.replace(/&lt;/g, '<');
+                decoded = decoded.replace(/&gt;/g, '>');
+                decoded = decoded.replace(/&amp;/g, '&');
+                return decoded;
+            } catch (e) {
+                console.error('Error in decodeHtmlEntities:', e);
+                return text;
+            }
+        }
+        
+        function addUnifiedBodyPattern(matchType = 'EXACT', expr = '', expected = '', ignoreCase = false) {
+            bodyPatternCounter++;
+            const conditionsList = document.getElementById('conditionsList');
+            
+            const conditionDiv = document.createElement('div');
+            conditionDiv.className = 'border border-green-200 rounded-lg p-3 bg-green-50';
+            conditionDiv.id = `condition-body-${bodyPatternCounter}`;
+            
+            conditionDiv.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="inline-block w-3 h-3 bg-green-500 rounded-full"></span>
+                        <span class="text-sm font-medium text-green-800">Body Pattern</span>
+                    </div>
+                    <button type="button" onclick="removeCondition('condition-body-${bodyPatternCounter}')" 
+                            class="text-red-500 hover:text-red-700 text-sm">Remove</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                        <select class="w-full border border-gray-300 rounded px-2 py-1 text-sm body-pattern-match-type" 
+                                onchange="updateBodyPattern(${bodyPatternCounter})">
+                            <option value="EXACT" ${matchType === 'EXACT' ? 'selected' : ''}>Exact</option>
+                            <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                            <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                            <option value="JSONPATH" ${matchType === 'JSONPATH' ? 'selected' : ''}>JSONPath</option>
+                            <option value="XPATH" ${matchType === 'XPATH' ? 'selected' : ''}>XPath</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">
+                            ${matchType === 'JSONPATH' ? 'JSONPath Expression & Expected Value' : 
+                              matchType === 'XPATH' ? 'XPath Expression & Expected Value' : 'Pattern/Value'}
+                        </label>
+                        <div class="flex space-x-2">
+                            ${matchType === 'JSONPATH' || matchType === 'XPATH' ? `
+                                <input type="text" class="w-1/2 border border-gray-300 rounded px-2 py-1 text-sm body-pattern-expr" 
+                                       value="${expr}" placeholder="$.field or //element" onchange="updateBodyPattern(${bodyPatternCounter})">
+                                <input type="text" class="w-1/2 border border-gray-300 rounded px-2 py-1 text-sm body-pattern-expected" 
+                                       value="${expected}" placeholder="expected value" onchange="updateBodyPattern(${bodyPatternCounter})">
+                            ` : `
+                                <textarea class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm body-pattern-expected font-mono" 
+                                          rows="2" placeholder="Enter your regex pattern, text to match, etc." 
+                                          onchange="updateBodyPattern(${bodyPatternCounter})">${expected}</textarea>
+                            `}
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-center">
+                    <label class="flex items-center space-x-1">
+                        <input type="checkbox" class="body-pattern-ignore-case" ${ignoreCase ? 'checked' : ''} 
+                               onchange="updateBodyPattern(${bodyPatternCounter})">
+                        <span class="text-xs text-gray-600">Ignore Case</span>
+                    </label>
+                </div>
+                <div class="mt-2">
+                    <p class="text-xs text-green-700">
+                        <strong>Current pattern:</strong> Check if request body does NOT contain "routing_number"
+                    </p>
+                </div>
+            `;
+            
+            conditionsList.appendChild(conditionDiv);
+            console.log('Added body pattern:', matchType, expr, expected, ignoreCase);
+            return bodyPatternCounter;
+        }
+        
+        function updateBodyPattern(patternId) {
+            console.log('Body pattern updated for:', patternId);
+            // Update the hidden textarea with current values
+            const patterns = [];
+            document.querySelectorAll('[id^="condition-body-"]').forEach(div => {
+                const matchType = div.querySelector('.body-pattern-match-type').value;
+                const expr = div.querySelector('.body-pattern-expr')?.value || '';
+                const expected = div.querySelector('.body-pattern-expected').value;
+                const ignoreCase = div.querySelector('.body-pattern-ignore-case').checked;
+                
+                patterns.push({
+                    matchType: matchType,
+                    expr: expr,
+                    expected: expected,
+                    ignoreCase: ignoreCase,
+                    matcher: matchType.toLowerCase()
+                });
+            });
+            
+            const bodyPatternsJson = document.getElementById('bodyPatternsJson');
+            if (bodyPatternsJson) {
+                bodyPatternsJson.value = JSON.stringify(patterns);
+                console.log('Updated bodyPatternsJson:', bodyPatternsJson.value);
+            }
+        }
+        
+        function removeCondition(conditionId) {
+            const element = document.getElementById(conditionId);
+            if (element) {
+                element.remove();
+                updateBodyPattern(0); // Update the JSON after removal
+            }
+        }
+        
+        function loadExistingConditions() {
+            const bodyPatternsJson = document.getElementById('bodyPatternsJson');
+            console.log('Loading existing conditions...');
+            console.log('bodyPatternsJson:', bodyPatternsJson);
+            console.log('bodyPatternsJson.value:', bodyPatternsJson ? bodyPatternsJson.value : 'null');
+            
+            if (bodyPatternsJson && bodyPatternsJson.value.trim() && bodyPatternsJson.value.trim() !== '[]') {
+                try {
+                    const decodedValue = decodeHtmlEntities(bodyPatternsJson.value);
+                    console.log('Decoded value:', decodedValue);
+                    const patterns = JSON.parse(decodedValue);
+                    console.log('Parsed patterns:', patterns);
+                    
+                    patterns.forEach((pattern, index) => {
+                        console.log(`Processing pattern ${index}:`, pattern);
+                        addUnifiedBodyPattern(
+                            pattern.matchType || 'EXACT',
+                            pattern.expr || '',
+                            pattern.expected || '',
+                            pattern.ignoreCase || false
+                        );
+                    });
+                } catch (e) {
+                    console.error('Failed to parse existing body patterns:', e);
+                }
+            }
+        }
+        
+        // Load patterns when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, loading existing conditions...');
+            loadExistingConditions();
+        });
+    </script>
+</body>
+</html>
