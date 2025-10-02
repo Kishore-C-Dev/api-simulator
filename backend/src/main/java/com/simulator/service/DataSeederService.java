@@ -32,7 +32,7 @@ public class DataSeederService implements CommandLineRunner {
     }
 
     public void seedDefaultMappings() {
-        List<RequestMapping> existingMappings = mappingRepository.findByDatasetOrderByPriorityDesc(activeDataset);
+        List<RequestMapping> existingMappings = mappingRepository.findByNamespaceOrderByPriorityDesc(activeDataset);
         
         if (!existingMappings.isEmpty()) {
             logger.info("Dataset '{}' already contains {} mappings, skipping seed", activeDataset, existingMappings.size());
@@ -48,7 +48,7 @@ public class DataSeederService implements CommandLineRunner {
         );
 
         for (RequestMapping mapping : seedMappings) {
-            mapping.setDataset(activeDataset);
+            mapping.setNamespace(activeDataset); // Use activeDataset as namespace for legacy support
             mapping.setCreatedAt(Instant.now());
             mapping.setUpdatedAt(Instant.now());
         }
