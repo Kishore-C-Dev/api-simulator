@@ -14,9 +14,11 @@ public class RequestMapping {
     @Id
     private String id;
     private String name;
-    private String dataset;
+    private String namespace;
     private Integer priority;
+    private EndpointType endpointType;
     private RequestSpec request;
+    private GraphQLSpec graphQLSpec;
     private ResponseSpec response;
     private DelaySpec delays;
     private Boolean enabled;
@@ -27,6 +29,8 @@ public class RequestMapping {
     
     @JsonProperty("updatedAt")
     private Instant updatedAt;
+    
+    private Boolean deleted;
 
     public static class RequestSpec {
         private String method;
@@ -138,6 +142,7 @@ public class RequestMapping {
         private String body;
         private Boolean templatingEnabled;
         private ConditionalResponses conditionalResponses;
+        private GraphQLResponseSpec graphQLResponse;
 
         public Integer getStatus() { return status; }
         public void setStatus(Integer status) { this.status = status; }
@@ -153,6 +158,43 @@ public class RequestMapping {
         
         public ConditionalResponses getConditionalResponses() { return conditionalResponses; }
         public void setConditionalResponses(ConditionalResponses conditionalResponses) { this.conditionalResponses = conditionalResponses; }
+
+        public GraphQLResponseSpec getGraphQLResponse() { return graphQLResponse; }
+        public void setGraphQLResponse(GraphQLResponseSpec graphQLResponse) { this.graphQLResponse = graphQLResponse; }
+    }
+
+    public static class GraphQLResponseSpec {
+        private Object data;
+        private List<GraphQLError> errors;
+        private Map<String, Object> extensions;
+
+        public Object getData() { return data; }
+        public void setData(Object data) { this.data = data; }
+
+        public List<GraphQLError> getErrors() { return errors; }
+        public void setErrors(List<GraphQLError> errors) { this.errors = errors; }
+
+        public Map<String, Object> getExtensions() { return extensions; }
+        public void setExtensions(Map<String, Object> extensions) { this.extensions = extensions; }
+
+        public static class GraphQLError {
+            private String message;
+            private List<Object> locations;
+            private List<String> path;
+            private Map<String, Object> extensions;
+
+            public String getMessage() { return message; }
+            public void setMessage(String message) { this.message = message; }
+
+            public List<Object> getLocations() { return locations; }
+            public void setLocations(List<Object> locations) { this.locations = locations; }
+
+            public List<String> getPath() { return path; }
+            public void setPath(List<String> path) { this.path = path; }
+
+            public Map<String, Object> getExtensions() { return extensions; }
+            public void setExtensions(Map<String, Object> extensions) { this.extensions = extensions; }
+        }
     }
 
     public static class DelaySpec {
@@ -233,14 +275,20 @@ public class RequestMapping {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     
-    public String getDataset() { return dataset; }
-    public void setDataset(String dataset) { this.dataset = dataset; }
+    public String getNamespace() { return namespace; }
+    public void setNamespace(String namespace) { this.namespace = namespace; }
     
     public Integer getPriority() { return priority; }
     public void setPriority(Integer priority) { this.priority = priority; }
     
+    public EndpointType getEndpointType() { return endpointType; }
+    public void setEndpointType(EndpointType endpointType) { this.endpointType = endpointType; }
+
     public RequestSpec getRequest() { return request; }
     public void setRequest(RequestSpec request) { this.request = request; }
+
+    public GraphQLSpec getGraphQLSpec() { return graphQLSpec; }
+    public void setGraphQLSpec(GraphQLSpec graphQLSpec) { this.graphQLSpec = graphQLSpec; }
     
     public ResponseSpec getResponse() { return response; }
     public void setResponse(ResponseSpec response) { this.response = response; }
@@ -259,4 +307,7 @@ public class RequestMapping {
     
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    
+    public Boolean getDeleted() { return deleted; }
+    public void setDeleted(Boolean deleted) { this.deleted = deleted; }
 }

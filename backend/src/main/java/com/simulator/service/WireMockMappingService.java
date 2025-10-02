@@ -11,6 +11,8 @@ import com.github.tomakehurst.wiremock.matching.UrlPattern;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
 import com.jayway.jsonpath.JsonPath;
 import com.simulator.model.RequestMapping;
+import com.simulator.model.EndpointType;
+import com.simulator.service.GraphQLResponseGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,11 +32,14 @@ public class WireMockMappingService {
     private final WireMockServer wireMockServer;
     private final DelayService delayService;
     private final ObjectMapper objectMapper;
+    private final GraphQLResponseGenerator graphQLResponseGenerator;
 
     @Autowired
-    public WireMockMappingService(WireMockServer wireMockServer, DelayService delayService) {
+    public WireMockMappingService(WireMockServer wireMockServer, DelayService delayService,
+                                 GraphQLResponseGenerator graphQLResponseGenerator) {
         this.wireMockServer = wireMockServer;
         this.delayService = delayService;
+        this.graphQLResponseGenerator = graphQLResponseGenerator;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.findAndRegisterModules(); // Register JavaTimeModule for Instant support
     }
@@ -56,9 +61,16 @@ public class WireMockMappingService {
     }
 
     private void createStubMapping(RequestMapping mapping) {
+        // Handle GraphQL endpoints differently
+        if (EndpointType.GRAPHQL.equals(mapping.getEndpointType())) {
+            createGraphQLStubMapping(mapping);
+            return;
+        }
+
+        // Handle regular REST endpoints
         MappingBuilder requestBuilder = buildRequestPattern(mapping.getRequest());
         ResponseDefinitionBuilder responseBuilder = buildResponse(mapping);
-        
+
         StubMapping stubMapping = wireMockServer.stubFor(
             requestBuilder.willReturn(responseBuilder)
         );
@@ -75,11 +87,130 @@ public class WireMockMappingService {
                 stubMapping.setId(UUID.fromString(uuidString));
             }
         }
-        
-        logger.debug("Created stub mapping: {} {} -> {}", 
-            mapping.getRequest().getMethod(), 
-            mapping.getRequest().getPath(), 
+
+        logger.debug("Created stub mapping: {} {} -> {}",
+            mapping.getRequest().getMethod(),
+            mapping.getRequest().getPath(),
             mapping.getResponse().getStatus());
+    }
+
+    private void createGraphQLStubMapping(RequestMapping mapping) {
+        logger.debug("Creating GraphQL stub mapping for: {}", mapping.getName());
+
+        // Create a POST request to /graphql with JSON body pattern matching
+        MappingBuilder requestBuilder = WireMock.post(WireMock.urlEqualTo("/graphql"))
+            .withHeader("Content-Type", WireMock.matching("application/json.*"));
+
+        // Add GraphQL-specific body patterns if available
+        if (mapping.getGraphQLSpec() != null) {
+            addGraphQLBodyPatterns(requestBuilder, mapping.getGraphQLSpec());
+        }
+
+        // Create GraphQL response using the GraphQLResponseGenerator
+        ResponseDefinitionBuilder responseBuilder = buildGraphQLResponse(mapping);
+
+        StubMapping stubMapping = wireMockServer.stubFor(
+            requestBuilder.willReturn(responseBuilder)
+        );
+        stubMapping.setPriority(mapping.getPriority());
+
+        if (mapping.getId() != null) {
+            try {
+                stubMapping.setId(UUID.fromString(mapping.getId()));
+            } catch (IllegalArgumentException e) {
+                String uuidString = convertObjectIdToUuid(mapping.getId());
+                stubMapping.setId(UUID.fromString(uuidString));
+            }
+        }
+
+        logger.debug("Created GraphQL stub mapping: {} -> GraphQL Response", mapping.getName());
+    }
+
+    private void addGraphQLBodyPatterns(MappingBuilder builder, com.simulator.model.GraphQLSpec spec) {
+        // Match GraphQL operation type and name if specified
+        if (spec.getOperationType() != null) {
+            String operationType = spec.getOperationType().name().toLowerCase();
+            builder.withRequestBody(WireMock.matchingJsonPath("$.query", WireMock.containing(operationType)));
+        }
+
+        if (spec.getOperationName() != null && !spec.getOperationName().trim().isEmpty()) {
+            // Match either explicit operationName field or operation name in query
+            builder.withRequestBody(WireMock.or(
+                WireMock.matchingJsonPath("$.operationName", WireMock.equalTo(spec.getOperationName())),
+                WireMock.matchingJsonPath("$.query", WireMock.containing(spec.getOperationName()))
+            ));
+        }
+
+        // Match query pattern if specified
+        if (spec.getQuery() != null && !spec.getQuery().trim().isEmpty()) {
+            // Use contains matching instead of regex to avoid issues with GraphQL syntax
+            String query = spec.getQuery().trim();
+            // For GraphQL queries, use a contains match instead of regex to avoid curly brace issues
+            builder.withRequestBody(WireMock.matchingJsonPath("$.query", WireMock.containing(query)));
+        }
+
+        // Match variables if specified
+        if (spec.getVariables() != null && !spec.getVariables().isEmpty()) {
+            for (Map.Entry<String, Object> var : spec.getVariables().entrySet()) {
+                String jsonPath = "$.variables." + var.getKey();
+                if (var.getValue() != null) {
+                    builder.withRequestBody(WireMock.matchingJsonPath(jsonPath, WireMock.equalTo(var.getValue().toString())));
+                } else {
+                    builder.withRequestBody(WireMock.matchingJsonPath(jsonPath));
+                }
+            }
+        }
+    }
+
+    private ResponseDefinitionBuilder buildGraphQLResponse(RequestMapping mapping) {
+        ResponseDefinitionBuilder builder = WireMock.aResponse()
+            .withStatus(200)
+            .withHeader("Content-Type", "application/json");
+
+        // Use a custom transformer that leverages the GraphQLResponseGenerator
+        try {
+            String mappingJson = objectMapper.writeValueAsString(mapping);
+            Map<String, Object> transformerParams = new HashMap<>();
+            transformerParams.put("mapping", mappingJson);
+            builder = builder.withTransformers("graphql-response");
+            builder = builder.withTransformerParameters(transformerParams);
+
+            // Set a default GraphQL response body as fallback
+            String fallbackResponse = "{\"data\": null, \"errors\": [{\"message\": \"GraphQL transformer not available\"}]}";
+            if (mapping.getResponse() != null && mapping.getResponse().getGraphQLResponse() != null) {
+                try {
+                    // Create a basic response from the GraphQL data
+                    Map<String, Object> response = new HashMap<>();
+                    if (mapping.getResponse().getGraphQLResponse().getData() != null) {
+                        response.put("data", mapping.getResponse().getGraphQLResponse().getData());
+                    }
+                    if (mapping.getResponse().getGraphQLResponse().getErrors() != null) {
+                        response.put("errors", mapping.getResponse().getGraphQLResponse().getErrors());
+                    }
+                    if (mapping.getResponse().getGraphQLResponse().getExtensions() != null) {
+                        response.put("extensions", mapping.getResponse().getGraphQLResponse().getExtensions());
+                    }
+                    fallbackResponse = objectMapper.writeValueAsString(response);
+                } catch (Exception e) {
+                    logger.warn("Failed to serialize GraphQL response: {}", e.getMessage());
+                }
+            }
+            builder = builder.withBody(fallbackResponse);
+
+            logger.debug("Applied GraphQL response transformer for mapping: {}", mapping.getName());
+        } catch (JsonProcessingException e) {
+            logger.error("Failed to serialize mapping for GraphQL response transformer: {}", e.getMessage());
+        }
+
+        // Add delay if configured
+        if (mapping.getDelays() != null) {
+            long delayMs = calculateDelayMs(mapping.getDelays());
+            if (delayMs > 0) {
+                builder = builder.withFixedDelay((int) delayMs);
+            }
+        }
+
+        return builder;
     }
 
     private MappingBuilder buildRequestPattern(RequestMapping.RequestSpec request) {

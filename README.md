@@ -1,6 +1,6 @@
 # API Simulator
 
-A WireMock-backed API simulator with a modern web interface built using Spring Boot 3, htmx, TailwindCSS, and MongoDB. Create, manage, and test mock REST APIs with JSON-only responses, configurable delays, and chaos engineering features.
+A WireMock-backed API simulator with a modern web interface built using Spring Boot 3, htmx, TailwindCSS, and MongoDB. Create, manage, and test mock REST APIs with JSON-only responses, configurable delays, chaos engineering features, and comprehensive user management with workspace isolation.
 
 ## 🚀 Features
 
@@ -16,6 +16,10 @@ A WireMock-backed API simulator with a modern web interface built using Spring B
 - **Handlebars Templating**: Dynamic response generation with request data
 - **Import/Export**: JSON-based configuration backup and sharing
 - **Test Interface**: Built-in test panel for API validation
+- **User Management**: Multi-user support with role-based access control (Admin/User roles)
+- **Workspace Isolation**: Complete isolation between different teams/projects
+- **Session-Based Authentication**: Secure user sessions with workspace switching
+- **Admin Dashboard**: Dedicated admin interface for user and workspace management
 - **Docker Support**: Complete containerization with Docker Compose
 
 ## 📋 Quick Start
@@ -38,7 +42,11 @@ A WireMock-backed API simulator with a modern web interface built using Spring B
    ```
 
 3. **Access the application**:
-   - **Web UI**: http://localhost:8080
+   - **Web UI**: http://localhost:8080 (redirects to login)
+   - **Admin Panel**: http://localhost:8080/admin/ui (Admin users only)
+   - **Login Credentials**:
+     - Admin: `admin` / `admin123` (access: default, demo workspaces)
+     - Demo User: `demo` / `demo123` (access: demo workspace only)
    - **WireMock API**: http://localhost:9999
    - **Admin API**: http://localhost:8080/admin
 
@@ -56,7 +64,8 @@ A WireMock-backed API simulator with a modern web interface built using Spring B
    ```
 
 3. **Access the application**:
-   - **Web UI**: http://localhost:8080
+   - **Web UI**: http://localhost:8080 (redirects to login)
+   - **Login required**: Use admin/admin123 or demo/demo123
    - **WireMock API**: http://localhost:9999
 
 ## 🎯 Default Seed Mappings
@@ -144,11 +153,15 @@ curl -X POST http://localhost:9999/api/memo \
 
 ## 🖥️ Web Interface
 
-### Dashboard
-- View all API mappings in a paginated table
-- Search mappings by name
-- Quick enable/disable toggles
-- Priority-based sorting
+### Dashboard (http://localhost:8080/)
+1. **Login**: Use admin/admin123 or demo/demo123
+2. **Workspace Selection**: Switch between available workspaces in top nav
+3. **Mapping Management**:
+   - View all API mappings in a paginated table (workspace-isolated)
+   - Search mappings by name
+   - Quick enable/disable toggles
+   - Priority-based sorting
+   - Create/edit/delete mappings with workspace isolation
 
 ### Create/Edit Mapping Form
 - **Unified Request Builder**: Single interface for all request matching conditions
@@ -167,10 +180,20 @@ curl -X POST http://localhost:9999/api/memo \
 - Real-time response display
 - WireMock endpoint testing guidance
 
+### Admin Panel (http://localhost:8080/admin/ui) - Admin Users Only
+1. **User Management**:
+   - Create/edit/delete user accounts
+   - Assign roles (Admin/User)
+   - Manage workspace access permissions
+2. **Workspace Management**:
+   - Create/edit/delete workspaces
+   - Assign users to workspaces
+   - Isolate configurations between teams/projects
+
 ### Import/Export
 - JSON-based configuration backup
 - Sample mapping downloads
-- Bulk import functionality
+- Bulk import functionality (workspace-isolated)
 
 ## 🛠️ API Reference
 
@@ -187,6 +210,28 @@ curl -X POST http://localhost:9999/api/memo \
 | `/admin/import` | POST | Import mappings from JSON file |
 | `/admin/export` | GET | Export mappings as JSON |
 
+### Authentication API
+
+| Endpoint | Method | Description |
+|----------|---------|-------------|
+| `/login` | POST | User login (returns session cookie) |
+| `/logout` | POST | User logout |
+| `/auth/current` | GET | Get current user session info |
+| `/auth/switch-workspace` | POST | Switch active workspace |
+
+### Admin User Management API
+
+| Endpoint | Method | Description |
+|----------|---------|-------------|
+| `/admin/users` | GET | List all users (Admin only) |
+| `/admin/users` | POST | Create new user (Admin only) |
+| `/admin/users/{id}` | PUT | Update user (Admin only) |
+| `/admin/users/{id}` | DELETE | Delete user (Admin only) |
+| `/admin/workspaces` | GET | List all workspaces |
+| `/admin/workspaces` | POST | Create new workspace (Admin only) |
+| `/admin/workspaces/{id}` | PUT | Update workspace (Admin only) |
+| `/admin/workspaces/{id}` | DELETE | Delete workspace (Admin only) |
+
 ### Test API
 
 | Endpoint | Method | Description |
@@ -199,6 +244,45 @@ All configured mappings are available on port `9999`. For example:
 - `http://localhost:9999/hello`
 - `http://localhost:9999/orders`
 - `http://localhost:9999/your-custom-endpoint`
+
+### Authentication & Authorization Examples
+
+```bash
+# Login via API (returns session cookie)
+curl -c cookies.txt -d "username=admin&password=admin123&workspace=default" \
+  -X POST http://localhost:8080/login
+
+# Use authenticated session for API calls
+curl -b cookies.txt http://localhost:8080/admin/mappings
+
+# Switch workspace in session
+curl -b cookies.txt -d "workspace=demo" \
+  -X POST http://localhost:8080/auth/switch-workspace
+
+# Check current user session
+curl -b cookies.txt http://localhost:8080/auth/current
+
+# Admin-only operations (create user)
+curl -b cookies.txt -X POST http://localhost:8080/admin/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser",
+    "password": "password123",
+    "role": "USER",
+    "workspaces": ["demo"]
+  }'
+
+# Create new workspace (admin only)
+curl -b cookies.txt -X POST http://localhost:8080/admin/workspaces \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "testteam",
+    "displayName": "Test Team Workspace"
+  }'
+
+# Logout
+curl -b cookies.txt -X POST http://localhost:8080/logout
+```
 
 ## 📝 Mapping Configuration
 
@@ -297,20 +381,21 @@ Priority 5: /api/memo + any other request → Default Error (400)
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MONGO_URI` | `mongodb://localhost:27017/simulator` | MongoDB connection string |
-| `ACTIVE_DATASET` | `default` | Active dataset name |
+| `ACTIVE_DATASET` | `default` | Active dataset name (deprecated - use workspaces) |
 | `SERVER_PORT` | `8080` | Spring Boot server port |
-| `AUTH_ENABLED` | `false` | Enable authentication (future) |
+| `AUTH_ENABLED` | `true` | Enable authentication and user management |
 
 ### Application Properties
 
 ```yaml
 simulator:
-  active-dataset: default
+  active-dataset: default  # Deprecated - use workspaces instead
   wiremock:
     port: 9999
     admin-port: 9998
   auth:
-    enabled: false
+    enabled: true
+    session-timeout: 3600  # Session timeout in seconds
 ```
 
 ## 🧪 Testing
@@ -420,6 +505,27 @@ Create ConfigMaps and Deployments for:
    Check: Enable templating checkbox for dynamic responses
    ```
 
+9. **Authentication Issues**
+   ```
+   Solution: Check login credentials and session
+   Action: Use admin/admin123 or demo/demo123
+   Check: Ensure AUTH_ENABLED=true in configuration
+   ```
+
+10. **Workspace Access Issues**
+    ```
+    Solution: Check user's workspace permissions
+    Action: Admin can assign users to workspaces
+    API: GET /auth/current to check current session
+    ```
+
+11. **Session Timeout**
+    ```
+    Solution: Re-login if session expires
+    Check: Default session timeout is 3600 seconds (1 hour)
+    Config: Adjust session-timeout in application.yml
+    ```
+
 ### Logging
 
 - **Application Logs**: Check Docker logs or console output
@@ -434,9 +540,7 @@ Create ConfigMaps and Deployments for:
 
 ## 🔮 Future Enhancements
 
-- [ ] Dataset switching and management UI
-- [ ] User authentication and authorization  
-- [ ] API usage analytics and metrics
+- [ ] API usage analytics and metrics dashboard
 - [ ] OpenAPI/Swagger spec import
 - [ ] GraphQL endpoint simulation
 - [ ] Webhook simulation capabilities
@@ -446,6 +550,10 @@ Create ConfigMaps and Deployments for:
 - [ ] Template editor with syntax highlighting
 - [ ] Bulk condition operations (copy, move, delete)
 - [ ] Advanced regex builder with pattern suggestions
+- [ ] Workspace-level statistics and reporting
+- [ ] User activity audit logs
+- [ ] Backup and restore functionality
+- [ ] LDAP/SSO integration for enterprise users
 
 ## 📄 License
 

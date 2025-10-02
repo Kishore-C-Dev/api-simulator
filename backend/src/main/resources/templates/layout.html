@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="'API Simulator - ' + ${title ?: 'Dashboard'}">API Simulator</title>
+    <title th:text="'Bank API Simulator - ' + ${title ?: 'Dashboard'}">Bank API Simulator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <link rel="stylesheet" th:href="@{/css/styles.css}">
@@ -15,34 +15,121 @@
     </style>
 </head>
 <body class="bg-gray-100">
-    <nav class="bg-blue-600 text-white shadow-lg">
+    <nav class="bg-green-700 text-white shadow-lg">
         <div class="container mx-auto px-4">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center space-x-8">
-                    <a th:href="@{/}" class="text-xl font-bold">API Simulator</a>
+                    <a th:href="@{/}" class="text-xl font-bold">Bank API Simulator</a>
                     <div class="hidden md:flex space-x-4">
-                        <a th:href="@{/}" class="hover:bg-blue-700 px-3 py-2 rounded transition-colors">Dashboard</a>
-                        <a th:href="@{/mappings/new}" class="hover:bg-blue-700 px-3 py-2 rounded transition-colors">New Mapping</a>
-                        <a th:href="@{/test}" class="hover:bg-blue-700 px-3 py-2 rounded transition-colors">Test Panel</a>
-                        <a th:href="@{/import-export}" class="hover:bg-blue-700 px-3 py-2 rounded transition-colors">Import/Export</a>
+                        <a th:href="@{/}" class="hover:bg-green-800 px-3 py-2 rounded transition-colors">Dashboard</a>
+                        <a th:href="@{/mappings/new}" class="hover:bg-green-800 px-3 py-2 rounded transition-colors">New Mapping</a>
+                        <a th:href="@{/test}" class="hover:bg-green-800 px-3 py-2 rounded transition-colors">Test Panel</a>
+                        <a th:href="@{/import-export}" class="hover:bg-green-800 px-3 py-2 rounded transition-colors">Import/Export</a>
+                        
+                        <!-- Admin Menu (only for admin users) -->
+                        <div th:if="${currentUser != null && currentUser.userId == 'admin'}" class="relative">
+                            <button id="adminMenuButton" 
+                                    class="hover:bg-green-800 px-3 py-2 rounded transition-colors flex items-center space-x-1"
+                                    onclick="toggleAdminMenu()">
+                                <span>Admin</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="adminMenu" 
+                                 class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                <div class="py-1">
+                                    <a th:href="@{/admin/users}" 
+                                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                                        <div class="flex items-center space-x-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                                            </svg>
+                                            <span>User Management</span>
+                                        </div>
+                                    </a>
+                                    <a th:href="@{/admin/namespaces}" 
+                                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                                        <div class="flex items-center space-x-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                            </svg>
+                                            <span>Namespace Management</span>
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <button 
-                        class="bg-blue-500 hover:bg-blue-700 px-4 py-2 rounded transition-colors"
-                        hx-post="/admin/mappings/refresh"
-                        hx-target="#refresh-result"
-                        hx-indicator="#refresh-spinner">
-                        <div id="refresh-spinner" class="htmx-indicator spinner inline-block mr-2"></div>
-                        Refresh WireMock
-                    </button>
-                    <div id="refresh-result" class="text-sm"></div>
+                    <!-- Simple Logout Button only -->
+                    <div th:if="${currentUser}">
+                        <a th:href="@{/logout}" 
+                           class="bg-red-600 hover:bg-red-700 px-3 py-2 rounded text-sm transition-colors">
+                            Logout
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </nav>
 
     <main class="container mx-auto px-4 py-8">
+        <!-- User Controls Fragment -->
+        <div th:fragment="userControls" th:if="${currentUser}" class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 mb-6 border border-green-200">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center text-white font-semibold">
+                            <span th:text="${currentUser.firstName.substring(0, 1).toUpperCase()}">U</span>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-gray-900">
+                                Welcome, <span th:text="${currentUser.displayName}">User Name</span>
+                            </div>
+                            <div class="text-xs text-gray-600">Logged in as <span th:text="${currentUser.userId}">userId</span></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Namespace Selector -->
+                    <div class="flex flex-col">
+                        <label for="namespaceSelector" class="text-xs font-medium text-gray-700 mb-1">Current Namespace:</label>
+                        <select id="namespaceSelector" 
+                                onchange="switchNamespace()" 
+                                class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option th:each="ns : ${userNamespaces}" 
+                                    th:value="${ns.name}" 
+                                    th:text="${ns.effectiveDisplayName}"
+                                    th:selected="${ns.name == currentNamespace}">
+                                Namespace
+                            </option>
+                        </select>
+                    </div>
+                    
+                    <!-- Refresh WireMock Button -->
+                    <div class="flex flex-col">
+                        <label class="text-xs font-medium text-gray-700 mb-1">WireMock:</label>
+                        <button 
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+                            hx-post="/admin/mappings/refresh"
+                            hx-target="#refresh-result"
+                            hx-indicator="#refresh-spinner">
+                            <div id="refresh-spinner" class="htmx-indicator spinner inline-block"></div>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+                    
+                    <div id="refresh-result" class="text-sm"></div>
+                </div>
+            </div>
+        </div>
+        
         <div th:replace="~{::content}"><!-- Content will be inserted here --></div>
     </main>
 
@@ -65,6 +152,44 @@
                 toast.classList.add('hidden');
             }, 3000);
         }
+
+        function switchNamespace() {
+            const namespace = document.getElementById('namespaceSelector').value;
+            if (!namespace) return;
+            
+            fetch('/switch-namespace', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'namespace=' + encodeURIComponent(namespace)
+            }).then(response => {
+                if (response.ok) {
+                    // Reload the page to show the new namespace data
+                    window.location.reload();
+                } else {
+                    showToast('Failed to switch namespace', 'error');
+                }
+            }).catch(error => {
+                console.error('Error switching namespace:', error);
+                showToast('Error switching namespace', 'error');
+            });
+        }
+
+        function toggleAdminMenu() {
+            const menu = document.getElementById('adminMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Close admin menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const menu = document.getElementById('adminMenu');
+            const button = document.getElementById('adminMenuButton');
+            
+            if (menu && button && !menu.contains(event.target) && !button.contains(event.target)) {
+                menu.classList.add('hidden');
+            }
+        });
 
         document.body.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.successful) {

@@ -2,7 +2,12 @@ package com.simulator.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.simulator.model.RequestMapping;
+import com.simulator.model.UserProfile;
+import com.simulator.model.Namespace;
 import com.simulator.service.MappingService;
+import com.simulator.service.SessionManager;
+import com.simulator.service.UserService;
+import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +20,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 @Controller
@@ -28,6 +34,12 @@ public class WebController {
     @Autowired
     private ObjectMapper objectMapper;
     
+    @Autowired
+    private SessionManager sessionManager;
+    
+    @Autowired
+    private UserService userService;
+    
     public WebController() {
         logger.info("WebController loaded with form endpoints");
     }
@@ -39,7 +51,22 @@ public class WebController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "name") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir,
+            HttpSession session,
             Model model) {
+        
+        // Check authentication
+        if (!sessionManager.isAuthenticated(session)) {
+            return "redirect:/login";
+        }
+        
+        UserProfile user = sessionManager.getCurrentUser(session);
+        String currentNamespace = sessionManager.getCurrentNamespace(session);
+        
+        // If no namespace selected, redirect to login to handle namespace assignment
+        if (currentNamespace == null) {
+            logger.warn("User {} has no accessible namespace", user.getUserId());
+            return "redirect:/login";
+        }
         
         // Build sort configuration - default is name ASC, then priority ASC
         Sort sort;
@@ -64,7 +91,10 @@ public class WebController {
         }
         
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<RequestMapping> mappings = mappingService.searchMappings(search, pageable);
+        Page<RequestMapping> mappings = mappingService.searchMappings(currentNamespace, search, pageable);
+        
+        // Get user's namespaces for dropdown
+        List<Namespace> userNamespaces = userService.getUserNamespaces(user.getUserId());
         
         model.addAttribute("mappings", mappings);
         model.addAttribute("search", search != null ? search : "");
@@ -73,11 +103,20 @@ public class WebController {
         model.addAttribute("currentPage", page);
         model.addAttribute("totalPages", mappings.getTotalPages());
         
+        // Add user and namespace info
+        model.addAttribute("currentUser", user);
+        model.addAttribute("currentNamespace", currentNamespace);
+        model.addAttribute("userNamespaces", userNamespaces);
+        
         return "dashboard";
     }
 
     @GetMapping("/mappings/new")
-    public String newMapping(Model model) {
+    public String newMapping(HttpSession session, Model model) {
+        // Check authentication
+        if (!sessionManager.isAuthenticated(session)) {
+            return "redirect:/login";
+        }
         model.addAttribute("mapping", new RequestMapping());
         model.addAttribute("isEdit", false);
         // Add empty JSON strings for new mappings
@@ -96,6 +135,25 @@ public class WebController {
         model.addAttribute("queryParamPatternsJson", "{}");
         model.addAttribute("bodyPatternsJson", "[]");
         return "mapping-form";
+    }
+
+    @GetMapping("/mappings/new/graphql")
+    public String newGraphQLMapping(HttpSession session, Model model) {
+        // Check authentication
+        if (!sessionManager.isAuthenticated(session)) {
+            return "redirect:/login";
+        }
+        model.addAttribute("mapping", new RequestMapping());
+        model.addAttribute("isEdit", false);
+        model.addAttribute("isGraphQL", true);
+
+        // Add empty GraphQL-specific data
+        model.addAttribute("graphqlData", "{}");
+        model.addAttribute("graphqlErrors", "[]");
+        model.addAttribute("graphqlExtensions", "{}");
+        model.addAttribute("graphqlVariables", "{}");
+
+        return "graphql-mapping-form";
     }
 
     @GetMapping("/mappings/{id}/edit")
@@ -186,7 +244,43 @@ public class WebController {
                         model.addAttribute("queryParamPatternsJson", "{}");
                         model.addAttribute("bodyPatternsJson", "[]");
                     }
-                    
+
+                    // Check if this is a GraphQL mapping
+                    if (mapping.getEndpointType() != null && mapping.getEndpointType().name().equals("GRAPHQL")) {
+                        model.addAttribute("isGraphQL", true);
+                        // Add GraphQL-specific data for editing
+                        if (mapping.getResponse() != null && mapping.getResponse().getGraphQLResponse() != null) {
+                            var graphqlResponse = mapping.getResponse().getGraphQLResponse();
+                            if (graphqlResponse.getData() != null) {
+                                model.addAttribute("graphqlData", objectMapper.writeValueAsString(graphqlResponse.getData()));
+                            } else {
+                                model.addAttribute("graphqlData", "{}");
+                            }
+                            if (graphqlResponse.getErrors() != null) {
+                                model.addAttribute("graphqlErrors", objectMapper.writeValueAsString(graphqlResponse.getErrors()));
+                            } else {
+                                model.addAttribute("graphqlErrors", "[]");
+                            }
+                            if (graphqlResponse.getExtensions() != null) {
+                                model.addAttribute("graphqlExtensions", objectMapper.writeValueAsString(graphqlResponse.getExtensions()));
+                            } else {
+                                model.addAttribute("graphqlExtensions", "{}");
+                            }
+                        } else {
+                            model.addAttribute("graphqlData", "{}");
+                            model.addAttribute("graphqlErrors", "[]");
+                            model.addAttribute("graphqlExtensions", "{}");
+                        }
+
+                        if (mapping.getGraphQLSpec() != null && mapping.getGraphQLSpec().getVariables() != null) {
+                            model.addAttribute("graphqlVariables", objectMapper.writeValueAsString(mapping.getGraphQLSpec().getVariables()));
+                        } else {
+                            model.addAttribute("graphqlVariables", "{}");
+                        }
+
+                        return "graphql-mapping-form";
+                    }
+
                     return "mapping-form";
                 } catch (Exception e) {
                     return "redirect:/";

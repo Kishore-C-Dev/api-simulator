@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout}">
+<head>
+    <title th:text="(${isEdit} ? 'Edit' : 'New') + ' GraphQL Mapping - API Simulator'">New GraphQL Mapping - API Simulator</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-900" th:text="${isEdit} ? 'Edit GraphQL Mapping' : 'Create New GraphQL Mapping'">
+                    Create New GraphQL Mapping
+                </h1>
+                <a th:href="@{/}" class="text-blue-600 hover:text-blue-800">← Back to Dashboard</a>
+            </div>
+
+            <form method="POST"
+                  th:action="${isEdit} ? @{'/admin/mappings/' + ${mapping.id} + '/form'} : @{/admin/mappings/form}"
+                  class="space-y-6">
+
+                <div id="form-result"></div>
+
+                <!-- Hidden field for endpoint type -->
+                <input type="hidden" name="endpointType" value="GRAPHQL">
+
+                <!-- Basic Information -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Mapping Name</label>
+                        <input type="text" id="name" name="name" required
+                               th:value="${mapping.name}"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="priority" class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                        <input type="number" id="priority" name="priority" min="1" max="10"
+                               th:value="${mapping.priority} ?: 5"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="enabled" class="flex items-center space-x-2">
+                            <input type="checkbox" id="enabled" name="enabled"
+                                   th:checked="${mapping.enabled} ?: true"
+                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm font-medium text-gray-700">Enabled</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label for="tags" class="block text-sm font-medium text-gray-700 mb-2">Tags (comma-separated)</label>
+                        <input type="text" id="tags" name="tags"
+                               th:value="${mapping.tags} ? ${#strings.listJoin(mapping.tags, ', ')} : ''"
+                               placeholder="graphql, query, user"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <!-- GraphQL Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">GraphQL Configuration</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="operationType" class="block text-sm font-medium text-gray-700 mb-2">Operation Type</label>
+                            <select id="operationType" name="graphqlOperationType" required
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="QUERY" th:selected="${mapping.graphQLSpec?.operationType?.name() == 'QUERY'}">Query</option>
+                                <option value="MUTATION" th:selected="${mapping.graphQLSpec?.operationType?.name() == 'MUTATION'}">Mutation</option>
+                                <option value="SUBSCRIPTION" th:selected="${mapping.graphQLSpec?.operationType?.name() == 'SUBSCRIPTION'}">Subscription</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="operationName" class="block text-sm font-medium text-gray-700 mb-2">Operation Name (optional)</label>
+                            <input type="text" id="operationName" name="graphqlOperationName"
+                                   th:value="${mapping.graphQLSpec?.operationName}"
+                                   placeholder="getUserById"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <label for="graphqlSchema" class="block text-sm font-medium text-gray-700 mb-2">GraphQL Schema (optional)</label>
+                        <textarea id="graphqlSchema" name="graphqlSchema" rows="8"
+                                  th:text="${mapping.graphQLSpec?.schema}"
+                                  placeholder="type Query {
+  user(id: ID!): User
+}
+
+type User {
+  id: ID!
+  name: String!
+  email: String!
+}"
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">Define the GraphQL schema for validation and introspection</p>
+                    </div>
+
+                    <div class="mt-6">
+                        <label for="graphqlQuery" class="block text-sm font-medium text-gray-700 mb-2">Query Pattern</label>
+                        <textarea id="graphqlQuery" name="graphqlQuery" rows="6" required
+                                  th:text="${mapping.graphQLSpec?.query}"
+                                  placeholder="query GetUser($id: ID!) {
+  user(id: $id) {
+    id
+    name
+    email
+  }
+}"
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">GraphQL query pattern to match incoming requests</p>
+                    </div>
+
+                    <div class="mt-6">
+                        <label for="graphqlVariables" class="block text-sm font-medium text-gray-700 mb-2">Variables Pattern (JSON)</label>
+                        <textarea id="graphqlVariables" name="graphqlVariables" rows="4"
+                                  placeholder='{"id": "123"}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">Expected variables pattern for matching (optional)</p>
+                    </div>
+                </div>
+
+                <!-- GraphQL Response Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">GraphQL Response Configuration</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="templating" class="flex items-center space-x-2">
+                                <input type="checkbox" id="templating" name="templatingEnabled"
+                                       th:checked="${mapping.response?.templatingEnabled}"
+                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm font-medium text-gray-700">Enable Handlebars Templating</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="graphqlData" class="block text-sm font-medium text-gray-700 mb-2">Response Data (JSON)</label>
+                        <textarea id="graphqlData" name="graphqlData" rows="8" required
+                                  th:text="${graphqlData}"
+                                  placeholder='{
+  "user": {
+    "id": "{{variables.id}}",
+    "name": "John Doe",
+    "email": "john@example.com"
+  }
+}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">GraphQL response data. Use {{variables.fieldName}} for templating.</p>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="graphqlErrors" class="block text-sm font-medium text-gray-700 mb-2">Errors (JSON Array - Optional)</label>
+                        <textarea id="graphqlErrors" name="graphqlErrors" rows="4"
+                                  th:text="${graphqlErrors}"
+                                  placeholder='[
+  {
+    "message": "User not found",
+    "locations": [{"line": 2, "column": 3}],
+    "path": ["user"],
+    "extensions": {"code": "USER_NOT_FOUND"}
+  }
+]'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">GraphQL errors array. Leave empty for successful responses.</p>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="graphqlExtensions" class="block text-sm font-medium text-gray-700 mb-2">Extensions (JSON - Optional)</label>
+                        <textarea id="graphqlExtensions" name="graphqlExtensions" rows="3"
+                                  th:text="${graphqlExtensions}"
+                                  placeholder='{"tracing": {"version": 1, "startTime": "2023-01-01T00:00:00.000Z"}}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">GraphQL extensions for additional response metadata.</p>
+                    </div>
+                </div>
+
+                <!-- Delay Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Delay Configuration</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label for="delayMode" class="block text-sm font-medium text-gray-700 mb-2">Delay Mode</label>
+                            <select id="delayMode" name="delayMode" onchange="toggleDelayFields()"
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="fixed" th:selected="${mapping.delays?.mode == 'fixed'}">Fixed</option>
+                                <option value="variable" th:selected="${mapping.delays?.mode == 'variable'}">Variable</option>
+                            </select>
+                        </div>
+                        <div id="fixedDelayDiv">
+                            <label for="fixedMs" class="block text-sm font-medium text-gray-700 mb-2">Fixed Delay (ms)</label>
+                            <input type="number" id="fixedMs" name="fixedMs" min="0"
+                                   th:value="${mapping.delays?.fixedMs} ?: 0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div id="variableDelayDiv" style="display: none;">
+                            <label for="variableMinMs" class="block text-sm font-medium text-gray-700 mb-2">Min Delay (ms)</label>
+                            <input type="number" id="variableMinMs" name="variableMinMs" min="0"
+                                   th:value="${mapping.delays?.variableMinMs} ?: 100"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
+                            <label for="variableMaxMs" class="block text-sm font-medium text-gray-700 mb-2">Max Delay (ms)</label>
+                            <input type="number" id="variableMaxMs" name="variableMaxMs" min="0"
+                                   th:value="${mapping.delays?.variableMaxMs} ?: 500"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <!-- Error Rate Configuration -->
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="errorRatePercent" class="block text-sm font-medium text-gray-700 mb-2">Error Rate (%)</label>
+                            <input type="number" id="errorRatePercent" name="errorRatePercent" min="0" max="100"
+                                   th:value="${mapping.delays?.errorRatePercent} ?: 0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="errorStatus" class="block text-sm font-medium text-gray-700 mb-2">Error Status</label>
+                            <input type="number" id="errorStatus" name="errorStatus" min="400" max="599"
+                                   th:value="${mapping.delays?.errorResponse?.status} ?: 500"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label for="errorBody" class="block text-sm font-medium text-gray-700 mb-2">Error Response Body (JSON)</label>
+                        <textarea id="errorBody" name="errorBody" rows="4"
+                                  th:text="${mapping.delays?.errorResponse?.body}"
+                                  placeholder='{"data": null, "errors": [{"message": "Service temporarily unavailable", "extensions": {"code": "RATE_LIMITED"}}]}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">GraphQL error response returned when error rate is triggered. Should follow GraphQL error format.</p>
+                    </div>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="flex items-center justify-between pt-6 border-t">
+                    <a th:href="@{/}" class="text-gray-600 hover:text-gray-800">Cancel</a>
+                    <div class="space-x-4">
+                        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                            <span th:text="${isEdit} ? 'Update GraphQL Mapping' : 'Create GraphQL Mapping'">Create GraphQL Mapping</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <script>
+            function toggleDelayFields() {
+                const mode = document.getElementById('delayMode').value;
+                const fixedDiv = document.getElementById('fixedDelayDiv');
+                const variableDiv = document.getElementById('variableDelayDiv');
+
+                if (mode === 'variable') {
+                    fixedDiv.style.display = 'none';
+                    variableDiv.style.display = 'block';
+                } else {
+                    fixedDiv.style.display = 'block';
+                    variableDiv.style.display = 'none';
+                }
+            }
+
+            // Initialize delay fields on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                toggleDelayFields();
+            });
+        </script>
+    </div>
+</body>
+</html>

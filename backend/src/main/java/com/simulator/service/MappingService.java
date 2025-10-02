@@ -28,49 +28,74 @@ public class MappingService {
     @Autowired
     private WireMockMappingService wireMockMappingService;
 
+    // New namespace-based methods
+    public List<RequestMapping> getAllMappings(String namespace) {
+        return mappingRepository.findByNamespaceOrderByPriorityDesc(namespace);
+    }
+
+    // Default method that uses activeDataset as namespace
     public List<RequestMapping> getAllMappings() {
-        return mappingRepository.findByDatasetOrderByPriorityDesc(activeDataset);
+        return getAllMappings(activeDataset);
     }
 
-    public List<RequestMapping> getEnabledMappings() {
-        return mappingRepository.findByDatasetAndEnabledOrderByPriorityDesc(activeDataset, true);
+    public List<RequestMapping> getEnabledMappings(String namespace) {
+        return mappingRepository.findByNamespaceAndEnabledOrderByPriorityDesc(namespace, true);
     }
 
-    public Page<RequestMapping> searchMappings(String query, Pageable pageable) {
+    public Page<RequestMapping> searchMappings(String namespace, String query, Pageable pageable) {
         if (query != null && !query.trim().isEmpty()) {
             // Use broader search criteria (name, path, method) with sorting support
-            return mappingRepository.findByDatasetAndSearchCriteria(activeDataset, query.trim(), pageable);
+            return mappingRepository.findByNamespaceAndSearchCriteria(namespace, query.trim(), pageable);
         }
-        // For no search, use the generic findByDataset which respects Pageable sorting
-        return mappingRepository.findByDataset(activeDataset, pageable);
+        // For no search, use the generic findByNamespace which respects Pageable sorting
+        return mappingRepository.findByNamespace(namespace, pageable);
     }
+
+    // Default method that uses activeDataset as namespace
+    public Page<RequestMapping> searchMappings(String query, Pageable pageable) {
+        return searchMappings(activeDataset, query, pageable);
+    }
+
 
     public Optional<RequestMapping> getMapping(String id) {
         return mappingRepository.findById(id);
     }
 
-    public RequestMapping saveMapping(RequestMapping mapping) {
+    public RequestMapping saveMapping(RequestMapping mapping, String namespace) {
         if (mapping.getId() == null) {
             mapping.setCreatedAt(Instant.now());
         }
         mapping.setUpdatedAt(Instant.now());
-        mapping.setDataset(activeDataset);
+        mapping.setNamespace(namespace);
         
         RequestMapping saved = mappingRepository.save(mapping);
         reloadWireMockMappings();
         return saved;
     }
 
+    // Default method that uses activeDataset as namespace
+    public RequestMapping saveMapping(RequestMapping mapping) {
+        return saveMapping(mapping, activeDataset);
+    }
+
+
     public void deleteMapping(String id) {
-        mappingRepository.deleteById(id);
-        reloadWireMockMappings();
+        // Soft delete: set deleted flag instead of actual deletion
+        Optional<RequestMapping> mappingOpt = mappingRepository.findById(id);
+        if (mappingOpt.isPresent()) {
+            RequestMapping mapping = mappingOpt.get();
+            mapping.setDeleted(true);
+            mapping.setUpdatedAt(Instant.now());
+            mappingRepository.save(mapping);
+            reloadWireMockMappings();
+        }
     }
 
     public void reloadWireMockMappings() {
         try {
-            List<RequestMapping> enabledMappings = getEnabledMappings();
+            List<RequestMapping> enabledMappings = getEnabledMappings(activeDataset);
             wireMockMappingService.loadMappings(enabledMappings);
-            logger.info("Reloaded {} WireMock mappings for dataset: {}", enabledMappings.size(), activeDataset);
+            logger.info("Reloaded {} WireMock mappings for namespace: {}", enabledMappings.size(), activeDataset);
         } catch (Exception e) {
             logger.error("Failed to reload WireMock mappings: {}", e.getMessage(), e);
         }
@@ -78,7 +103,7 @@ public class MappingService {
 
     public void importMappings(List<RequestMapping> mappings) {
         for (RequestMapping mapping : mappings) {
-            mapping.setDataset(activeDataset);
+            mapping.setNamespace(activeDataset); // Use activeDataset as namespace for legacy support
             mapping.setCreatedAt(Instant.now());
             mapping.setUpdatedAt(Instant.now());
         }
@@ -87,7 +112,7 @@ public class MappingService {
     }
 
     public void clearDataset(String dataset) {
-        mappingRepository.deleteByDataset(dataset);
+        mappingRepository.deleteByNamespace(dataset); // Use namespace method
         if (dataset.equals(activeDataset)) {
             reloadWireMockMappings();
         }

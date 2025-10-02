@@ -12,21 +12,25 @@ import java.util.List;
 @Repository
 public interface RequestMappingRepository extends MongoRepository<RequestMapping, String> {
     
-    List<RequestMapping> findByDatasetAndEnabledOrderByPriorityDesc(String dataset, Boolean enabled);
+    @Query("{ 'namespace': ?0, 'enabled': ?1, 'deleted': { $ne: true } }")
+    List<RequestMapping> findByNamespaceAndEnabledOrderByPriorityDesc(String namespace, Boolean enabled);
     
-    List<RequestMapping> findByDatasetOrderByPriorityDesc(String dataset);
+    @Query("{ 'namespace': ?0, 'deleted': { $ne: true } }")
+    List<RequestMapping> findByNamespaceOrderByPriorityDesc(String namespace);
     
     // These methods will respect the Pageable sorting parameters
-    Page<RequestMapping> findByDatasetAndNameContainingIgnoreCase(String dataset, String name, Pageable pageable);
+    @Query("{ 'namespace': ?0, 'name': { $regex: ?1, $options: 'i' }, 'deleted': { $ne: true } }")
+    Page<RequestMapping> findByNamespaceAndNameContainingIgnoreCase(String namespace, String name, Pageable pageable);
     
-    Page<RequestMapping> findByDataset(String dataset, Pageable pageable);
+    @Query("{ 'namespace': ?0, 'deleted': { $ne: true } }")
+    Page<RequestMapping> findByNamespace(String namespace, Pageable pageable);
     
     // Custom query for search with broader criteria
-    @Query("{ 'dataset': ?0, $or: [ {'name': {$regex: ?1, $options: 'i'}}, {'request.path': {$regex: ?1, $options: 'i'}}, {'request.method': {$regex: ?1, $options: 'i'}} ] }")
-    Page<RequestMapping> findByDatasetAndSearchCriteria(String dataset, String searchTerm, Pageable pageable);
+    @Query("{ 'namespace': ?0, $or: [ {'name': {$regex: ?1, $options: 'i'}}, {'request.path': {$regex: ?1, $options: 'i'}}, {'request.method': {$regex: ?1, $options: 'i'}} ], 'deleted': { $ne: true } }")
+    Page<RequestMapping> findByNamespaceAndSearchCriteria(String namespace, String searchTerm, Pageable pageable);
     
-    @Query("{ 'dataset': ?0, 'tags': { $in: ?1 } }")
-    List<RequestMapping> findByDatasetAndTagsIn(String dataset, List<String> tags);
+    @Query("{ 'namespace': ?0, 'tags': { $in: ?1 }, 'deleted': { $ne: true } }")
+    List<RequestMapping> findByNamespaceAndTagsIn(String namespace, List<String> tags);
     
-    void deleteByDataset(String dataset);
+    void deleteByNamespace(String namespace);
 }

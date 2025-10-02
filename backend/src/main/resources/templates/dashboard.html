@@ -16,16 +16,19 @@
                             type="text" 
                             placeholder="Search by path, method..."
                             th:value="${search}"
-                            class="border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-r-lg hover:bg-blue-600 transition-colors">
+                            class="border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-r-lg hover:bg-green-700 transition-colors">
                             Search
                         </button>
                         <!-- Hidden inputs to preserve sort parameters -->
                         <input type="hidden" name="sortBy" th:value="${sortBy}">
                         <input type="hidden" name="sortDir" th:value="${sortDir}">
                     </form>
-                    <a th:href="@{/mappings/new}" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors text-center">
-                        New Mapping
+                    <a th:href="@{/mappings/new}" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-center">
+                        New REST Mapping
+                    </a>
+                    <a th:href="@{/mappings/new/graphql}" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-center">
+                        New GraphQL Mapping
                     </a>
                 </div>
             </div>
@@ -42,7 +45,7 @@
                                 type="text" 
                                 placeholder="Type to filter by mapping name..."
                                 th:value="${search}"
-                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                             <!-- Hidden inputs to preserve sort parameters -->
                             <input type="hidden" name="sortBy" th:value="${sortBy}">
                             <input type="hidden" name="sortDir" th:value="${sortDir}">
@@ -52,13 +55,14 @@
                     <div class="flex-shrink-0">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
                         <form class="flex gap-2" hx-get="/" hx-target="main" hx-trigger="change">
-                            <select name="sortBy" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <select name="sortBy" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                                 <option value="name" th:selected="${sortBy == 'name'}">Name</option>
+                                <option value="endpointType" th:selected="${sortBy == 'endpointType'}">Type</option>
                                 <option value="priority" th:selected="${sortBy == 'priority'}">Priority</option>
                                 <option value="method" th:selected="${sortBy == 'method'}">Method</option>
                                 <option value="path" th:selected="${sortBy == 'path'}">Path</option>
                             </select>
-                            <select name="sortDir" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <select name="sortDir" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                                 <option value="asc" th:selected="${sortDir == 'asc'}">↑ Ascending</option>
                                 <option value="desc" th:selected="${sortDir == 'desc'}">↓ Descending</option>
                             </select>
@@ -77,16 +81,16 @@
             </div>
 
             <!-- Current Filters and Sort Status -->
-            <div th:if="${search != null && !search.isEmpty()} or ${sortBy != 'name'} or ${sortDir != 'asc'}" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div th:if="${search != null && !search.isEmpty()} or ${sortBy != 'name'} or ${sortDir != 'asc'}" class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                    <span class="font-medium text-blue-800">Active filters:</span>
-                    <span th:if="${search != null && !search.isEmpty()}" class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-md">
+                    <span class="font-medium text-green-800">Active filters:</span>
+                    <span th:if="${search != null && !search.isEmpty()}" class="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded-md">
                         <span>Search: "<span th:text="${search}"></span>"</span>
-                        <a th:href="@{'/?sortBy=' + ${sortBy} + '&sortDir=' + ${sortDir}}" class="ml-1 text-blue-600 hover:text-blue-800">×</a>
+                        <a th:href="@{'/?sortBy=' + ${sortBy} + '&sortDir=' + ${sortDir}}" class="ml-1 text-green-600 hover:text-green-800">×</a>
                     </span>
-                    <span th:if="${sortBy != 'name'} or ${sortDir != 'asc'}" class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-md">
+                    <span th:if="${sortBy != 'name'} or ${sortDir != 'asc'}" class="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded-md">
                         <span>Sort: <span th:text="${sortBy}"></span> <span th:text="${sortDir == 'asc' ? '↑' : '↓'}"></span></span>
-                        <a th:href="@{'/' + (${search} ? '?search=' + ${search} : '')}" class="ml-1 text-blue-600 hover:text-blue-800">×</a>
+                        <a th:href="@{'/' + (${search} ? '?search=' + ${search} : '')}" class="ml-1 text-green-600 hover:text-green-800">×</a>
                     </span>
                 </div>
             </div>
@@ -105,8 +109,9 @@
                                     </span>
                                 </a>
                             </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                <a th:href="@{'/?sortBy=method&sortDir=' + (${sortBy == 'method' && sortDir == 'asc'} ? 'desc' : 'asc') + (${search} ? '&search=' + ${search} : '')}" 
+                                <a th:href="@{'/?sortBy=method&sortDir=' + (${sortBy == 'method' && sortDir == 'asc'} ? 'desc' : 'asc') + (${search} ? '&search=' + ${search} : '')}"
                                    class="flex items-center space-x-1 hover:text-gray-700">
                                     <span>Method</span>
                                     <span th:if="${sortBy == 'method'}" class="text-blue-500">
@@ -141,7 +146,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <tr th:if="${mappings.empty}" class="text-center">
-                            <td colspan="6" class="px-6 py-4 text-sm text-gray-500">
+                            <td colspan="7" class="px-6 py-4 text-sm text-gray-500">
                                 No mappings found. <a th:href="@{/mappings/new}" class="text-blue-500 hover:underline">Create your first mapping</a>
                             </td>
                         </tr>
@@ -149,22 +154,32 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900" th:text="${mapping.name}">Mapping Name</div>
                                 <div class="text-sm text-gray-500" th:if="${mapping.tags}">
-                                    <span th:each="tag : ${mapping.tags}" 
-                                          class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1" 
+                                    <span th:each="tag : ${mapping.tags}"
+                                          class="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-1"
                                           th:text="${tag}">tag</span>
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 py-1 text-xs font-semibold rounded-full"
-                                      th:text="${mapping.request.method}"
-                                      th:class="${mapping.request.method == 'GET' ? 'bg-blue-100 text-blue-800' : 
-                                                mapping.request.method == 'POST' ? 'bg-green-100 text-green-800' :
-                                                mapping.request.method == 'PUT' ? 'bg-yellow-100 text-yellow-800' :
-                                                mapping.request.method == 'DELETE' ? 'bg-red-100 text-red-800' :
+                                      th:text="${mapping.endpointType != null ? mapping.endpointType.name() : 'REST'}"
+                                      th:class="${mapping.endpointType != null && mapping.endpointType.name() == 'GRAPHQL'} ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'">
+                                    REST
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full"
+                                      th:text="${mapping.request?.method ?: 'POST'}"
+                                      th:class="${(mapping.request?.method ?: 'POST') == 'GET' ? 'bg-blue-100 text-blue-800' :
+                                                (mapping.request?.method ?: 'POST') == 'POST' ? 'bg-green-100 text-green-800' :
+                                                (mapping.request?.method ?: 'POST') == 'PUT' ? 'bg-yellow-100 text-yellow-800' :
+                                                (mapping.request?.method ?: 'POST') == 'DELETE' ? 'bg-red-100 text-red-800' :
                                                 'bg-gray-100 text-gray-800'}">GET</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" th:text="${mapping.request.path}">
-                                /api/path
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <span th:if="${mapping.endpointType != null && mapping.endpointType.name() == 'GRAPHQL'}"
+                                      class="text-purple-600 font-medium">GraphQL Endpoint</span>
+                                <span th:if="${mapping.endpointType == null || mapping.endpointType.name() != 'GRAPHQL'}"
+                                      th:text="${mapping.request?.path ?: '/api/path'}">/api/path</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 py-1 text-xs font-semibold rounded-full"
@@ -176,7 +191,7 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" th:text="${mapping.priority}">5</td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                 <a th:href="@{'/mappings/' + ${mapping.id} + '/edit'}" 
-                                   class="text-blue-600 hover:text-blue-900">Edit</a>
+                                   class="text-green-600 hover:text-green-900">Edit</a>
                                 <button 
                                     class="text-red-600 hover:text-red-900"
                                     th:attr="hx-delete=@{'/admin/mappings/' + ${mapping.id}}"
@@ -215,7 +230,7 @@
                            class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50"></a>
                         <span th:if="${i == currentPage}"
                               th:text="${i + 1}"
-                              class="px-3 py-2 bg-blue-600 border border-blue-600 rounded-md text-sm font-medium text-white"></span>
+                              class="px-3 py-2 bg-green-600 border border-green-600 rounded-md text-sm font-medium text-white"></span>
                     </span>
                     
                     <a th:if="${currentPage < totalPages - 1}" 
