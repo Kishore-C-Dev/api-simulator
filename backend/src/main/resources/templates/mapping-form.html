@@ -669,16 +669,14 @@
             }
             
             function addUnifiedBodyPattern(matchType = 'CONTAINS', expr = '', expected = '', ignoreCase = false) {
-                console.log('Debug - addUnifiedBodyPattern called with:', { matchType, expr, expected, ignoreCase });
                 conditionCounter++;
                 const conditionsList = document.getElementById('conditionsList');
-                console.log('Debug - conditionsList element:', conditionsList);
-                
+
                 const conditionDiv = document.createElement('div');
                 conditionDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
                 conditionDiv.id = `condition-${conditionCounter}`;
                 conditionDiv.setAttribute('data-type', 'body');
-                
+
                 conditionDiv.innerHTML = `
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center space-x-2">
@@ -687,7 +685,7 @@
                                 ${generateConditionDescription('body', matchType, expr, expected)}
                             </span>
                         </div>
-                        <button type="button" onclick="removeCondition('condition-${conditionCounter}')" 
+                        <button type="button" onclick="removeCondition('condition-${conditionCounter}')"
                                 class="text-red-600 hover:text-red-800 text-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -697,7 +695,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
-                            <select class="condition-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                            <select class="condition-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm"
                                     onchange="updateCondition('condition-${conditionCounter}')">
                                 <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
                                 <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
@@ -707,29 +705,26 @@
                         </div>
                         <div class="condition-expr-field" style="display: ${matchType === 'JSONPATH' || matchType === 'XPATH' ? 'block' : 'none'};">
                             <label class="block text-xs font-medium text-gray-700 mb-1">Expression</label>
-                            <input type="text" class="condition-expr w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                            <input type="text" class="condition-expr w-full border border-gray-300 rounded px-2 py-1 text-sm"
                                    value="${expr}" placeholder="$.user.id" onchange="updateCondition('condition-${conditionCounter}')">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-700 mb-1">Expected Value</label>
-                            <input type="text" class="condition-expected w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                            <input type="text" class="condition-expected w-full border border-gray-300 rounded px-2 py-1 text-sm"
                                    value="${expected}" placeholder="Expected value" onchange="updateCondition('condition-${conditionCounter}')">
                         </div>
                         <div class="flex items-center">
                             <label class="flex items-center space-x-1">
-                                <input type="checkbox" class="condition-ignore-case rounded border-gray-300 text-blue-600" 
+                                <input type="checkbox" class="condition-ignore-case rounded border-gray-300 text-blue-600"
                                        ${ignoreCase ? 'checked' : ''} onchange="updateCondition('condition-${conditionCounter}')">
                                 <span class="text-xs text-gray-700">Ignore Case</span>
                             </label>
                         </div>
                     </div>
                 `;
-                
-                console.log('Debug - about to appendChild conditionDiv:', conditionDiv);
+
                 conditionsList.appendChild(conditionDiv);
-                console.log('Debug - appendChild completed, conditionsList children count:', conditionsList.children.length);
                 updateAllPatterns();
-                console.log('Debug - updateAllPatterns completed');
             }
             
             function addUnifiedHeaderPattern(matchType = 'EXACT', name = '', pattern = '', ignoreCase = false) {
@@ -1012,13 +1007,8 @@
                 const conditionsList = document.getElementById('conditionsList');
                 const noConditionsMessage = document.getElementById('noConditionsMessage');
                 const conditions = conditionsList.querySelectorAll('[id^="condition-"]');
-                
-                console.log('Debug - updateNoConditionsMessage called');
-                console.log('Debug - conditions found:', conditions.length);
-                console.log('Debug - noConditionsMessage exists:', !!noConditionsMessage);
-                
+
                 if (conditions.length === 0) {
-                    console.log('Debug - no conditions, showing message');
                     if (!noConditionsMessage) {
                         const messageDiv = document.createElement('div');
                         messageDiv.id = 'noConditionsMessage';
@@ -1027,9 +1017,7 @@
                         conditionsList.appendChild(messageDiv);
                     }
                 } else {
-                    console.log('Debug - conditions exist, removing message');
                     if (noConditionsMessage) {
-                        console.log('Debug - removing noConditionsMessage');
                         noConditionsMessage.remove();
                     }
                 }
@@ -1043,24 +1031,16 @@
             }
             
             function loadExistingConditions() {
+                // Set flag to prevent updateHeaderPatterns from overwriting during load
+                isLoadingExistingPatterns = true;
+
                 // Load existing body patterns into unified interface
                 const bodyPatternsJson = document.getElementById('bodyPatternsJson');
-                console.log('Debug - bodyPatternsJson element:', bodyPatternsJson);
-                console.log('Debug - bodyPatternsJson outerHTML:', bodyPatternsJson ? bodyPatternsJson.outerHTML : 'null');
-                console.log('Debug - bodyPatternsJson value:', bodyPatternsJson ? bodyPatternsJson.value : 'null');
-                console.log('Debug - bodyPatternsJson value length:', bodyPatternsJson ? bodyPatternsJson.value.length : 'null');
-                console.log('Debug - bodyPatternsJson value trimmed:', bodyPatternsJson ? bodyPatternsJson.value.trim() : 'null');
-                console.log('Debug - condition check:', bodyPatternsJson && bodyPatternsJson.value.trim() && bodyPatternsJson.value.trim() !== '[]');
-                
                 if (bodyPatternsJson && bodyPatternsJson.value.trim() && bodyPatternsJson.value.trim() !== '[]') {
-                    console.log('Debug - entering body patterns loading');
                     try {
                         const decodedValue = decodeHtmlEntities(bodyPatternsJson.value);
-                        console.log('Debug - decoded value:', decodedValue);
                         const patterns = JSON.parse(decodedValue);
-                        console.log('Debug - parsed patterns:', patterns);
                         patterns.forEach((pattern, index) => {
-                            console.log(`Debug - processing pattern ${index}:`, pattern);
                             addUnifiedBodyPattern(
                                 pattern.matchType || 'EXACT',
                                 pattern.expr || '',
@@ -1071,10 +1051,8 @@
                     } catch (e) {
                         console.error('Failed to parse existing body patterns:', e);
                     }
-                } else {
-                    console.log('Debug - body patterns condition failed');
                 }
-                
+
                 // Load existing header patterns into unified interface
                 const headerPatternsJson = document.getElementById('headerPatternsJson');
                 if (headerPatternsJson && headerPatternsJson.value.trim() && headerPatternsJson.value !== '{}') {
@@ -1090,9 +1068,12 @@
                             );
                         });
                     } catch (e) {
-                        console.warn('Failed to parse existing header patterns:', e);
+                        console.error('Failed to parse existing header patterns:', e);
                     }
                 }
+
+                // Reset flag after loading is complete
+                isLoadingExistingPatterns = false;
                 
                 // Load existing query parameter patterns into unified interface
                 const queryParamPatternsJson = document.getElementById('queryParamPatternsJson');
@@ -1136,9 +1117,6 @@
                 // Final debug - show what's actually in conditionsList
                 setTimeout(function() {
                     const finalConditionsList = document.getElementById('conditionsList');
-                    console.log('Debug - Final conditionsList innerHTML:', finalConditionsList.innerHTML);
-                    console.log('Debug - Final conditionsList children count:', finalConditionsList.children.length);
-                    console.log('Debug - Final conditionsList visible elements:', Array.from(finalConditionsList.children).map(el => el.style.display !== 'none'));
                 }, 200);
             }
             
@@ -1165,16 +1143,23 @@
                 document.getElementById('bodyPatternsJson').value = JSON.stringify(bodyPatterns);
             }
             
+            let isLoadingExistingPatterns = false;
+
             function updateHeaderPatterns() {
+                // Don't overwrite during initial load of existing patterns
+                if (isLoadingExistingPatterns) {
+                    return;
+                }
+
                 const headerPatterns = {};
                 const headerConditions = document.querySelectorAll('[data-type="header"]');
-                
+
                 headerConditions.forEach(conditionDiv => {
                     const name = conditionDiv.querySelector('.condition-name').value.trim();
                     const matchType = conditionDiv.querySelector('.condition-match-type').value;
                     const pattern = conditionDiv.querySelector('.condition-pattern').value;
                     const ignoreCase = conditionDiv.querySelector('.condition-ignore-case').checked;
-                    
+
                     if (name) {
                         headerPatterns[name] = {
                             matchType: matchType,
@@ -1183,9 +1168,9 @@
                         };
                     }
                 });
-                
+
                 document.getElementById('headerPatternsJson').value = JSON.stringify(headerPatterns);
-                
+
                 // Update mode to advanced if we have patterns
                 const hasPatterns = Object.keys(headerPatterns).length > 0;
                 document.getElementById('headerMatchingMode').value = hasPatterns ? 'advanced' : 'simple';
@@ -1342,13 +1327,83 @@
                 
                 document.getElementById('bodyPatternsJson').value = JSON.stringify(patterns);
             }
-            
+
+            // Load AI-generated mapping data from URL parameter
+            function loadAIGeneratedData() {
+                try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const aiData = urlParams.get('ai-data');
+
+                    if (!aiData) {
+                        return; // No AI data, normal form load
+                    }
+
+                    console.log('Loading AI-generated data...');
+                    const mapping = JSON.parse(decodeURIComponent(aiData));
+                    console.log('Parsed mapping:', mapping);
+
+                    // Populate basic fields
+                    if (mapping.name) document.getElementById('name').value = mapping.name;
+                    if (mapping.priority) document.getElementById('priority').value = mapping.priority;
+                    if (mapping.enabled !== undefined) document.getElementById('enabled').checked = mapping.enabled;
+
+                    // Populate tags
+                    if (mapping.tags && mapping.tags.length > 0) {
+                        document.getElementById('tags').value = mapping.tags.join(', ');
+                    }
+
+                    // Populate request fields
+                    if (mapping.request) {
+                        if (mapping.request.method) document.getElementById('method').value = mapping.request.method;
+                        if (mapping.request.path) document.getElementById('path').value = mapping.request.path;
+                    }
+
+                    // Populate response fields
+                    if (mapping.response) {
+                        if (mapping.response.status) document.getElementById('status').value = mapping.response.status;
+                        if (mapping.response.body) document.getElementById('body').value = mapping.response.body;
+                        if (mapping.response.templatingEnabled !== undefined) {
+                            document.getElementById('templatingEnabled').checked = mapping.response.templatingEnabled;
+                        }
+
+                        // Populate response headers
+                        if (mapping.response.headers) {
+                            const headerTextarea = document.getElementById('headers');
+                            if (headerTextarea) {
+                                headerTextarea.value = JSON.stringify(mapping.response.headers, null, 2);
+                            }
+                        }
+                    }
+
+                    // Populate delays
+                    if (mapping.delays) {
+                        if (mapping.delays.mode) {
+                            document.getElementById('delayMode').value = mapping.delays.mode;
+                            toggleDelayFields(); // Update visible fields based on mode
+                        }
+                        if (mapping.delays.fixedMs) document.getElementById('fixedDelayMs').value = mapping.delays.fixedMs;
+                        if (mapping.delays.minMs) document.getElementById('minDelayMs').value = mapping.delays.minMs;
+                        if (mapping.delays.maxMs) document.getElementById('maxDelayMs').value = mapping.delays.maxMs;
+                        if (mapping.delays.errorRatePercent !== undefined) {
+                            document.getElementById('errorRatePercent').value = mapping.delays.errorRatePercent;
+                        }
+                    }
+
+                    console.log('AI-generated data loaded successfully');
+                } catch (error) {
+                    console.error('Error loading AI-generated data:', error);
+                }
+            }
+
             // Initialize on page load
             document.addEventListener('DOMContentLoaded', function() {
+                // Check for AI-generated data in URL parameter
+                loadAIGeneratedData();
+
                 toggleDelayFields();
                 toggleConditionalResponses();
                 loadExistingConditionalMappings();
-                
+
                 // Initialize advanced pattern form values from hidden inputs
                 initializeAdvancedPatternForms();
                 

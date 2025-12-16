@@ -1,25 +1,56 @@
 # API Simulator
 
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
+![Java](https://img.shields.io/badge/Java-17-orange)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.0-green)
+![MongoDB](https://img.shields.io/badge/MongoDB-7.0-green)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
 A WireMock-backed API simulator with a modern web interface built using Spring Boot 3, htmx, TailwindCSS, and MongoDB. Create, manage, and test mock REST APIs with JSON-only responses, configurable delays, chaos engineering features, and comprehensive user management with workspace isolation.
+
+**Perfect for:** Development teams needing to mock external APIs, test error scenarios, simulate network latency, and maintain isolated workspaces for different projects.
+
+## Table of Contents
+
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [Demo Endpoints](#-default-seed-mappings)
+- [Web Interface](#-web-interface)
+- [API Reference](#-api-reference)
+- [Configuration](#-configuration-options)
+- [Testing](#-testing)
+- [Deployment](#-deployment)
+- [Troubleshooting](#-troubleshooting)
+- [Documentation](#-documentation)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ## 🚀 Features
 
+### Core Capabilities
 - **WireMock Integration**: Embedded WireMock server for reliable API simulation
 - **MongoDB Persistence**: All mappings and configurations stored in MongoDB
 - **Modern Web UI**: htmx + TailwindCSS for responsive, interactive interface
 - **JSON-Only Responses**: Focused on JSON API simulation (no binary/Base64)
+
+### Advanced Matching & Routing
 - **Unified Request Builder**: Single interface for all request matching conditions
 - **Advanced Pattern Matching**: JSONPath, XPath, regex, headers, query params, body patterns
 - **Priority-Based Routing**: Multiple endpoints with configurable priority order
+- **GraphQL Support**: Full GraphQL endpoint simulation capabilities
+
+### Testing & Resilience
 - **Delay Simulation**: Fixed or variable delays with jitter
 - **Chaos Engineering**: Configurable error rates with alternate error responses
 - **Handlebars Templating**: Dynamic response generation with request data
-- **Import/Export**: JSON-based configuration backup and sharing
 - **Test Interface**: Built-in test panel for API validation
+
+### Enterprise Features
 - **User Management**: Multi-user support with role-based access control (Admin/User roles)
 - **Workspace Isolation**: Complete isolation between different teams/projects
 - **Session-Based Authentication**: Secure user sessions with workspace switching
 - **Admin Dashboard**: Dedicated admin interface for user and workspace management
+- **Import/Export**: JSON-based configuration backup and sharing
 - **Docker Support**: Complete containerization with Docker Compose
 
 ## 📋 Quick Start
@@ -284,6 +315,16 @@ curl -b cookies.txt -X POST http://localhost:8080/admin/workspaces \
 curl -b cookies.txt -X POST http://localhost:8080/logout
 ```
 
+## 🛠️ Technologies Used
+
+- **Backend:** Java 17, Spring Boot 3.2.0, WireMock 3.3.1
+- **Database:** MongoDB 7.0+
+- **Frontend:** htmx, TailwindCSS, Thymeleaf
+- **Build:** Maven 3.6+
+- **Containerization:** Docker, Docker Compose
+
+For detailed technical documentation, see [CLAUDE.md](CLAUDE.md).
+
 ## 📝 Mapping Configuration
 
 ### Unified Request Conditions
@@ -538,11 +579,30 @@ Create ConfigMaps and Deployments for:
 - **Memory Settings**: Configure JVM heap size for larger datasets
 - **Connection Pooling**: MongoDB connection pool sizing
 
+## 📚 Documentation
+
+### User Documentation
+- **README.md** (this file): Quick start guide, features, and basic usage
+- **API Reference**: See [API Reference](#-api-reference) section above
+
+### Technical Documentation
+- **CLAUDE.md**: Comprehensive technical documentation for developers and AI assistants
+  - Complete architecture overview
+  - Detailed API specifications
+  - Database schema
+  - Development workflows
+  - Troubleshooting guides
+  - Performance optimization tips
+
+### Additional Resources
+- **Code Comments**: Inline documentation in source code
+- **Example Mappings**: Pre-configured demo endpoints included
+- **Test Panel**: Interactive testing interface at http://localhost:8080/test
+
 ## 🔮 Future Enhancements
 
 - [ ] API usage analytics and metrics dashboard
 - [ ] OpenAPI/Swagger spec import
-- [ ] GraphQL endpoint simulation
 - [ ] Webhook simulation capabilities
 - [ ] Request/response transformation pipelines
 - [ ] A/B testing support with multiple response variants
@@ -557,22 +617,77 @@ Create ConfigMaps and Deployments for:
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+We welcome contributions! Here's how you can help:
+
+1. **Fork the repository**
+2. **Create a feature branch**
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+3. **Make your changes**
+   - Follow existing code style and conventions
+   - Add tests for new functionality
+   - Update documentation as needed
+4. **Commit your changes**
+   ```bash
+   git commit -m 'Add amazing feature'
+   ```
+5. **Push to your branch**
+   ```bash
+   git push origin feature/amazing-feature
+   ```
+6. **Open a Pull Request**
+   - Describe your changes clearly
+   - Reference any related issues
+   - Ensure all tests pass
+
+### Development Setup
+
+See [CLAUDE.md - Development Workflow](CLAUDE.md#development-workflow) for detailed setup instructions.
+
+### Code of Conduct
+
+Please be respectful and constructive in all interactions. We aim to maintain a welcoming community for all contributors.
 
 ## 📞 Support
 
-- **Issues**: Report bugs and request features via GitHub Issues
-- **Documentation**: This README and inline code documentation
-- **Community**: Discussions and Q&A via GitHub Discussions
+### Getting Help
+- **Issues**: Report bugs and request features via [GitHub Issues](../../issues)
+- **Documentation**:
+  - User guide: This README
+  - Technical docs: [CLAUDE.md](CLAUDE.md)
+  - Inline code documentation
+- **Community**: Discussions and Q&A via [GitHub Discussions](../../discussions)
+
+### Reporting Bugs
+
+When reporting bugs, please include:
+- API Simulator version
+- Java version (`java -version`)
+- MongoDB version
+- Steps to reproduce the issue
+- Expected vs. actual behavior
+- Relevant logs or error messages
+
+### Feature Requests
+
+We love hearing about new feature ideas! Please:
+- Check existing issues first to avoid duplicates
+- Describe the use case and benefit
+- Provide examples if possible
+
+## 👥 Acknowledgments
+
+Built with these amazing technologies:
+- [Spring Boot](https://spring.io/projects/spring-boot) - Application framework
+- [WireMock](https://wiremock.org/) - API simulation engine
+- [htmx](https://htmx.org/) - Dynamic HTML interactions
+- [TailwindCSS](https://tailwindcss.com/) - Utility-first CSS
+- [MongoDB](https://www.mongodb.com/) - NoSQL database
 
 ---
 
-**Built with ❤️ using Spring Boot 3, WireMock, htmx, TailwindCSS, and MongoDB**

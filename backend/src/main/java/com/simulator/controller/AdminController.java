@@ -182,7 +182,7 @@ public class AdminController {
             
             mapping.setId(id);
             RequestMapping saved = mappingService.saveMapping(mapping);
-            
+
             // Return a redirect response for form submissions
             return ResponseEntity.status(302).header("Location", "/").build();
         } catch (Exception e) {
@@ -295,9 +295,17 @@ public class AdminController {
         
         // Build request
         RequestMapping.RequestSpec request = new RequestMapping.RequestSpec();
-        request.setMethod(requestMethod);
-        request.setPath(requestPath);
-        
+
+        // For GraphQL endpoints, set method to POST and use the provided path (defaults to /graphql if not set)
+        if (EndpointType.GRAPHQL.equals(mapping.getEndpointType())) {
+            request.setMethod("POST");
+            request.setPath(requestPath != null && !requestPath.trim().isEmpty() ? requestPath : "/graphql");
+        } else {
+            // For REST endpoints
+            request.setMethod(requestMethod);
+            request.setPath(requestPath);
+        }
+
         if (requestHeaders != null && !requestHeaders.trim().isEmpty()) {
             request.setHeaders(objectMapper.readValue(requestHeaders, Map.class));
         }

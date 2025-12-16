@@ -248,6 +248,14 @@ public class WebController {
                     // Check if this is a GraphQL mapping
                     if (mapping.getEndpointType() != null && mapping.getEndpointType().name().equals("GRAPHQL")) {
                         model.addAttribute("isGraphQL", true);
+
+                        // Add GraphQL endpoint path for editing
+                        if (mapping.getRequest() != null && mapping.getRequest().getPath() != null) {
+                            model.addAttribute("requestPath", mapping.getRequest().getPath());
+                        } else {
+                            model.addAttribute("requestPath", "/graphql");
+                        }
+
                         // Add GraphQL-specific data for editing
                         if (mapping.getResponse() != null && mapping.getResponse().getGraphQLResponse() != null) {
                             var graphqlResponse = mapping.getResponse().getGraphQLResponse();
@@ -386,6 +394,8 @@ public class WebController {
         
         try {
             logger.info("Updating mapping {} from form submission", id);
+            logger.debug("Header matching mode: {}", headerMatchingMode);
+            logger.debug("Header patterns JSON: {}", headerPatternsJson);
             RequestMapping mapping = buildMappingFromForm(name, priority, enabled, tags, 
                 requestMethod, requestPath, requestHeaders, requestQueryParams,
                 responseStatus, responseHeaders, responseBody, templatingEnabled,
@@ -496,12 +506,18 @@ public class WebController {
         // Process Header Patterns
         if ("advanced".equals(headerMatchingMode) && headerPatternsJson != null && !headerPatternsJson.trim().isEmpty()) {
             try {
+                logger.debug("Parsing header patterns JSON: {}", headerPatternsJson);
                 java.util.Map<String, RequestMapping.ParameterPattern> headerPatterns = objectMapper.readValue(
                     headerPatternsJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, RequestMapping.ParameterPattern>>() {});
+                logger.debug("Parsed header patterns: {}", headerPatterns);
                 request.setHeaderPatterns(headerPatterns);
+                logger.debug("Header patterns set on request object");
             } catch (Exception e) {
-                logger.warn("Failed to parse header patterns JSON: {}", e.getMessage());
+                logger.error("Failed to parse header patterns JSON: {} - Error: {}", headerPatternsJson, e.getMessage(), e);
             }
+        } else {
+            logger.debug("Skipping header patterns - Mode: {}, JSON empty: {}",
+                headerMatchingMode, headerPatternsJson == null || headerPatternsJson.trim().isEmpty());
         }
         
         // Process Query Parameter Patterns

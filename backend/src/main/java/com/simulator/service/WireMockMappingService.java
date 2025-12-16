@@ -97,8 +97,15 @@ public class WireMockMappingService {
     private void createGraphQLStubMapping(RequestMapping mapping) {
         logger.debug("Creating GraphQL stub mapping for: {}", mapping.getName());
 
-        // Create a POST request to /graphql with JSON body pattern matching
-        MappingBuilder requestBuilder = WireMock.post(WireMock.urlEqualTo("/graphql"))
+        // Get GraphQL endpoint path from mapping or use default /graphql
+        String graphqlPath = "/graphql"; // Default fallback
+        if (mapping.getRequest() != null && mapping.getRequest().getPath() != null
+                && !mapping.getRequest().getPath().trim().isEmpty()) {
+            graphqlPath = mapping.getRequest().getPath();
+        }
+
+        // Create a POST request to the specified GraphQL path with JSON body pattern matching
+        MappingBuilder requestBuilder = WireMock.post(WireMock.urlEqualTo(graphqlPath))
             .withHeader("Content-Type", WireMock.matching("application/json.*"));
 
         // Add GraphQL-specific body patterns if available

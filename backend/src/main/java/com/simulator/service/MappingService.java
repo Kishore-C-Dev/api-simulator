@@ -91,6 +91,32 @@ public class MappingService {
         }
     }
 
+    /**
+     * Move mapping to a different namespace/workspace
+     */
+    public RequestMapping moveMapping(String mappingId, String targetNamespace) {
+        Optional<RequestMapping> mappingOpt = mappingRepository.findById(mappingId);
+        if (mappingOpt.isEmpty()) {
+            throw new IllegalArgumentException("Mapping not found with ID: " + mappingId);
+        }
+
+        RequestMapping mapping = mappingOpt.get();
+        String oldNamespace = mapping.getNamespace();
+
+        mapping.setNamespace(targetNamespace);
+        mapping.setUpdatedAt(Instant.now());
+
+        RequestMapping saved = mappingRepository.save(mapping);
+
+        logger.info("Moved mapping '{}' from namespace '{}' to '{}'",
+            mapping.getName(), oldNamespace, targetNamespace);
+
+        // Reload WireMock mappings for both namespaces
+        reloadWireMockMappings();
+
+        return saved;
+    }
+
     public void reloadWireMockMappings() {
         try {
             List<RequestMapping> enabledMappings = getEnabledMappings(activeDataset);
