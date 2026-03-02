@@ -3,16 +3,21 @@
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![Java](https://img.shields.io/badge/Java-17-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.0-green)
-![MongoDB](https://img.shields.io/badge/MongoDB-7.0-green)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-A WireMock-backed API simulator with a modern web interface built using Spring Boot 3, htmx, TailwindCSS, and MongoDB. Create, manage, and test mock REST APIs with JSON-only responses, configurable delays, chaos engineering features, and comprehensive user management with workspace isolation.
+A WireMock-backed API simulator with a modern web interface built using Spring Boot 3, htmx, TailwindCSS, and PostgreSQL. Create, manage, and test mock REST APIs with JSON-only responses, configurable delays, chaos engineering features, and comprehensive user management with workspace isolation.
+
+The system is split into two independent services:
+- **Admin Console** (port 8080) — web UI for creating and managing mock mappings, users, and workspaces.
+- **Mock Server** (port 9999) — headless WireMock instance that serves simulated API responses for a given namespace.
 
 **Perfect for:** Development teams needing to mock external APIs, test error scenarios, simulate network latency, and maintain isolated workspaces for different projects.
 
 ## Table of Contents
 
 - [Features](#-features)
+- [Architecture](#-architecture)
 - [Quick Start](#-quick-start)
 - [Demo Endpoints](#-default-seed-mappings)
 - [Web Interface](#-web-interface)
@@ -21,7 +26,6 @@ A WireMock-backed API simulator with a modern web interface built using Spring B
 - [Testing](#-testing)
 - [Deployment](#-deployment)
 - [Troubleshooting](#-troubleshooting)
-- [Documentation](#-documentation)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -29,9 +33,9 @@ A WireMock-backed API simulator with a modern web interface built using Spring B
 
 ### Core Capabilities
 - **WireMock Integration**: Embedded WireMock server for reliable API simulation
-- **MongoDB Persistence**: All mappings and configurations stored in MongoDB
+- **PostgreSQL Persistence**: All mappings and configurations stored in PostgreSQL with JSONB columns for flexible schema
 - **Modern Web UI**: htmx + TailwindCSS for responsive, interactive interface
-- **JSON-Only Responses**: Focused on JSON API simulation (no binary/Base64)
+- **JSON-Only Responses**: Focused on JSON API simulation
 
 ### Advanced Matching & Routing
 - **Unified Request Builder**: Single interface for all request matching conditions
@@ -53,32 +57,56 @@ A WireMock-backed API simulator with a modern web interface built using Spring B
 - **Import/Export**: JSON-based configuration backup and sharing
 - **Docker Support**: Complete containerization with Docker Compose
 
+## 🏗️ Architecture
+
+```
+┌──────────────────────────────────┐      ┌─────────────────────────────────┐
+│   Admin Console  (port 8080)     │      │   Mock Server   (port 9999)     │
+│                                  │      │                                 │
+│  Web UI  ──►  MappingService     │      │  WireMock ◄── MockServerInit   │
+│               UserService         │─ POST /refresh ──►                   │
+│               NamespaceService   │      │  (reloads stubs from DB)        │
+└──────────────┬───────────────────┘      └───────────────┬─────────────────┘
+               │                                          │
+               └──────────────┬───────────────────────────┘
+                              │
+                  ┌───────────▼───────────┐
+                  │   PostgreSQL  (5432)  │
+                  │  mappings, users,     │
+                  │  namespaces           │
+                  └───────────────────────┘
+```
+
+**Communication flow:** Admin Console saves a mapping → notifies each registered Mock Server via `POST /refresh` → Mock Server reloads its stubs from PostgreSQL → simulated API is immediately live on port 9999.
+
+Multiple Mock Server instances can be registered (one per namespace) via the `MOCK_SERVER_URLS` environment variable.
+
 ## 📋 Quick Start
 
 ### Option 1: Docker Compose (Recommended)
 
-1. **Clone and navigate to the project**:
+1. **Clone the repository**:
    ```bash
    git clone <repository-url>
    cd api-simulator
    ```
 
-2. **Build and start services**:
+2. **Build and start all services**:
    ```bash
-   # Build the Spring Boot application
-   cd backend && mvn clean package -DskipTests && cd ..
-   
-   # Start all services
-   docker-compose up --build
+   docker-compose up --build -d
    ```
 
+   This starts three containers:
+   - `api-simulator-postgres` — PostgreSQL 16 database
+   - `api-simulator-admin-console` — Admin web UI
+   - `api-simulator-mock-server-default` — WireMock for the `default` namespace
+
 3. **Access the application**:
-   - **Web UI**: http://localhost:8080 (redirects to login)
-   - **Admin Panel**: http://localhost:8080/admin/ui (Admin users only)
+   - **Web UI**: http://localhost:8080
    - **Login Credentials**:
      - Admin: `admin` / `admin123` (access: default, demo workspaces)
      - Demo User: `demo` / `demo123` (access: demo workspace only)
-   - **WireMock API**: http://localhost:9999
+   - **Simulated APIs**: http://localhost:9999
    - **Admin API**: http://localhost:8080/admin
 
 ### Option 2: Local Development
@@ -86,97 +114,96 @@ A WireMock-backed API simulator with a modern web interface built using Spring B
 1. **Prerequisites**:
    - Java 17+
    - Maven 3.6+
-   - MongoDB 7.0+ (running on localhost:27017)
+   - PostgreSQL 16 (running on localhost:5432 with database `appdb`, user `appuser`, password `apppass`)
 
-2. **Run the application**:
+2. **Start admin-console**:
    ```bash
-   cd backend
+   cd admin-console
    mvn spring-boot:run
    ```
 
-3. **Access the application**:
-   - **Web UI**: http://localhost:8080 (redirects to login)
-   - **Login required**: Use admin/admin123 or demo/demo123
-   - **WireMock API**: http://localhost:9999
+3. **Start mock-server** (separate terminal):
+   ```bash
+   cd mock-server
+   mvn spring-boot:run
+   ```
+
+4. **Access the application**:
+   - **Web UI**: http://localhost:8080
+   - **Simulated APIs**: http://localhost:9999
+   - **Mock Server management**: http://localhost:8090
 
 ## 🎯 Default Seed Mappings
 
-The application comes with five pre-configured endpoints demonstrating various features:
+The application starts with five pre-configured endpoints demonstrating various features:
 
 ### 1. Hello World Endpoint
 - **Method**: GET
 - **Path**: `/hello`
-- **Response**: `{"message": "world", "timestamp": "2024-01-01T12:00:00Z", "source": "API Simulator"}`
+- **Response**: `{"message": "world", "timestamp": "...", "source": "API Simulator"}`
 - **Delay**: Fixed 200ms
 
-### 2. Order Creation Endpoint  
+### 2. Order Creation Endpoint
 - **Method**: POST
 - **Path**: `/orders`
 - **Response**: Echoes request body with generated ID
-- **Delay**: Variable 100-800ms
+- **Delay**: Variable 100–800ms
 - **Example Response**:
   ```json
   {
     "id": "uuid-generated",
     "status": "created",
-    "timestamp": "2024-01-01T12:00:00Z",
-    "receivedData": {...your request body...}
+    "timestamp": "...",
+    "receivedData": { "...your request body..." }
   }
   ```
 
 ### 3. Flaky Endpoint (Chaos Engineering)
-- **Method**: GET  
+- **Method**: GET
 - **Path**: `/flaky`
 - **Success Rate**: 85% (returns 200)
 - **Error Rate**: 15% (returns 500)
 - **Delay**: Fixed 300ms
 
-### 4. Memo Endpoint - Account Validation (Priority: 1)
-- **Method**: POST
-- **Path**: `/api/memo`
-- **Condition**: JSONPath validation for `account_number = "1234567890"`
-- **Headers**: Requires `Content-Type: application/json`
-- **Response**: Success message with account number
-- **Status**: 200
+### 4. Memo Endpoint — Account Validation (Priority: 1)
+- **Method**: POST / **Path**: `/api/memo`
+- **Condition**: JSONPath `$.account_number` equals `1234567890`
+- **Response**: 200 Success
 
-### 5. Memo Endpoint - Missing Routing Number (Priority: 2)  
-- **Method**: POST
-- **Path**: `/api/memo`
-- **Condition**: Regex pattern `^(?!.*routing_number).*$` (requests without routing_number)
-- **Response**: Error message for missing routing number
-- **Status**: 400
+### 5. Memo Endpoint — Missing Routing Number (Priority: 2)
+- **Method**: POST / **Path**: `/api/memo`
+- **Condition**: Regex `^(?!.*routing_number).*$`
+- **Response**: 400 error
 
-### 6. Memo Endpoint - Default Error (Priority: 5)
-- **Method**: POST
-- **Path**: `/api/memo`  
-- **Condition**: Catch-all for other invalid requests
-- **Response**: Generic error for invalid requests
-- **Status**: 400
+### 6. Memo Endpoint — Default Error (Priority: 5)
+- **Method**: POST / **Path**: `/api/memo`
+- **Condition**: Catch-all
+- **Response**: 400 error
 
 **Test these endpoints**:
 ```bash
-# Test hello endpoint
+# Hello World
 curl http://localhost:9999/hello
 
-# Test order creation
+# Order creation
 curl -X POST http://localhost:9999/orders \
   -H "Content-Type: application/json" \
   -d '{"item": "laptop", "quantity": 1}'
 
-# Test flaky endpoint (run multiple times)
+# Flaky endpoint (run multiple times to see errors)
 curl http://localhost:9999/flaky
 
-# Test memo with valid account number
+# Memo — valid account
+curl -X POST http://localhost:9999/api/memo \
+  -H "Content-Type: application/json" \
+  -d '{"account_number": "1234567890", "routing_number": "021000021", "amount": 100}'
+
+# Memo — missing routing number (400)
 curl -X POST http://localhost:9999/api/memo \
   -H "Content-Type: application/json" \
   -d '{"account_number": "1234567890", "amount": 100}'
 
-# Test memo missing routing number (triggers 400 error)
-curl -X POST http://localhost:9999/api/memo \
-  -H "Content-Type: application/json" \
-  -d '{"account_number": "1234567890", "amount": 100}'
-
-# Test memo with invalid data (triggers default error)
+# Memo — invalid data (400)
 curl -X POST http://localhost:9999/api/memo \
   -H "Content-Type: application/json" \
   -d '{"invalid": "data"}'
@@ -186,13 +213,13 @@ curl -X POST http://localhost:9999/api/memo \
 
 ### Dashboard (http://localhost:8080/)
 1. **Login**: Use admin/admin123 or demo/demo123
-2. **Workspace Selection**: Switch between available workspaces in top nav
+2. **Workspace Selection**: Switch between available workspaces in the top nav
 3. **Mapping Management**:
    - View all API mappings in a paginated table (workspace-isolated)
    - Search mappings by name
    - Quick enable/disable toggles
    - Priority-based sorting
-   - Create/edit/delete mappings with workspace isolation
+   - Create/edit/delete mappings
 
 ### Create/Edit Mapping Form
 - **Unified Request Builder**: Single interface for all request matching conditions
@@ -200,7 +227,7 @@ curl -X POST http://localhost:9999/api/memo \
   - Header Patterns (Exact, Regex, Contains, Exists)
   - Query Parameters (Exact, Regex, Contains, Exists)
   - Path Patterns (Exact, Wildcard, Regex)
-- **Priority-Based Routing**: Configure endpoint priority (1-10, lower = higher priority)
+- **Priority-Based Routing**: Configure endpoint priority (1–10, lower = higher priority)
 - **Response Configuration**: Status, headers, JSON body with Handlebars templating
 - **Delay Settings**: Fixed or variable delays with chaos engineering
 - **Conditional Responses**: Request ID-based response variants
@@ -209,51 +236,44 @@ curl -X POST http://localhost:9999/api/memo \
 - Built-in JSON echo endpoint for testing
 - Quick test buttons for common scenarios
 - Real-time response display
-- WireMock endpoint testing guidance
 
-### Admin Panel (http://localhost:8080/admin/ui) - Admin Users Only
-1. **User Management**:
-   - Create/edit/delete user accounts
-   - Assign roles (Admin/User)
-   - Manage workspace access permissions
-2. **Workspace Management**:
-   - Create/edit/delete workspaces
-   - Assign users to workspaces
-   - Isolate configurations between teams/projects
+### Admin Panel (http://localhost:8080/admin/ui) — Admin Users Only
+1. **User Management**: Create/edit/delete accounts, assign roles, manage workspace access
+2. **Workspace Management**: Create/edit/delete workspaces, assign users
 
 ### Import/Export
 - JSON-based configuration backup
 - Sample mapping downloads
-- Bulk import functionality (workspace-isolated)
+- Bulk import (workspace-isolated)
 
 ## 🛠️ API Reference
 
-### Admin REST API
+### Admin REST API (port 8080)
 
 | Endpoint | Method | Description |
-|----------|---------|-------------|
+|----------|--------|-------------|
 | `/admin/mappings` | GET | List all mappings (paginated) |
 | `/admin/mappings/{id}` | GET | Get mapping by ID |
 | `/admin/mappings` | POST | Create new mapping |
 | `/admin/mappings/{id}` | PUT | Update existing mapping |
 | `/admin/mappings/{id}` | DELETE | Delete mapping |
-| `/admin/mappings/refresh` | POST | Reload WireMock stubs |
+| `/admin/mappings/refresh` | POST | Push mappings to all mock servers |
 | `/admin/import` | POST | Import mappings from JSON file |
 | `/admin/export` | GET | Export mappings as JSON |
 
 ### Authentication API
 
 | Endpoint | Method | Description |
-|----------|---------|-------------|
+|----------|--------|-------------|
 | `/login` | POST | User login (returns session cookie) |
 | `/logout` | POST | User logout |
 | `/auth/current` | GET | Get current user session info |
 | `/auth/switch-workspace` | POST | Switch active workspace |
 
-### Admin User Management API
+### Admin User & Workspace Management API
 
 | Endpoint | Method | Description |
-|----------|---------|-------------|
+|----------|--------|-------------|
 | `/admin/users` | GET | List all users (Admin only) |
 | `/admin/users` | POST | Create new user (Admin only) |
 | `/admin/users/{id}` | PUT | Update user (Admin only) |
@@ -263,53 +283,37 @@ curl -X POST http://localhost:9999/api/memo \
 | `/admin/workspaces/{id}` | PUT | Update workspace (Admin only) |
 | `/admin/workspaces/{id}` | DELETE | Delete workspace (Admin only) |
 
+### Mock Server Management API (port 8090)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/refresh` | POST | Reload WireMock stubs from database |
+| `/actuator/health` | GET | Mock server health check |
+
 ### Test API
 
 | Endpoint | Method | Description |
-|----------|---------|-------------|
+|----------|--------|-------------|
 | `/test/echo` | POST | Echo JSON request with metadata |
 
-### WireMock API
-
-All configured mappings are available on port `9999`. For example:
-- `http://localhost:9999/hello`
-- `http://localhost:9999/orders`
-- `http://localhost:9999/your-custom-endpoint`
-
-### Authentication & Authorization Examples
+### Authentication Examples
 
 ```bash
-# Login via API (returns session cookie)
+# Login (returns session cookie)
 curl -c cookies.txt -d "username=admin&password=admin123&workspace=default" \
   -X POST http://localhost:8080/login
 
-# Use authenticated session for API calls
+# Use authenticated session
 curl -b cookies.txt http://localhost:8080/admin/mappings
 
-# Switch workspace in session
+# Switch workspace
 curl -b cookies.txt -d "workspace=demo" \
   -X POST http://localhost:8080/auth/switch-workspace
 
-# Check current user session
-curl -b cookies.txt http://localhost:8080/auth/current
-
-# Admin-only operations (create user)
+# Create a user (admin only)
 curl -b cookies.txt -X POST http://localhost:8080/admin/users \
   -H "Content-Type: application/json" \
-  -d '{
-    "username": "newuser",
-    "password": "password123",
-    "role": "USER",
-    "workspaces": ["demo"]
-  }'
-
-# Create new workspace (admin only)
-curl -b cookies.txt -X POST http://localhost:8080/admin/workspaces \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "testteam",
-    "displayName": "Test Team Workspace"
-  }'
+  -d '{"username": "newuser", "password": "password123", "role": "USER", "workspaces": ["demo"]}'
 
 # Logout
 curl -b cookies.txt -X POST http://localhost:8080/logout
@@ -318,22 +322,18 @@ curl -b cookies.txt -X POST http://localhost:8080/logout
 ## 🛠️ Technologies Used
 
 - **Backend:** Java 17, Spring Boot 3.2.0, WireMock 3.3.1
-- **Database:** MongoDB 7.0+
+- **Database:** PostgreSQL 16 (JPA/Hibernate, JSONB for complex fields)
 - **Frontend:** htmx, TailwindCSS, Thymeleaf
 - **Build:** Maven 3.6+
 - **Containerization:** Docker, Docker Compose
 
-For detailed technical documentation, see [CLAUDE.md](CLAUDE.md).
-
 ## 📝 Mapping Configuration
 
-### Unified Request Conditions
-
-The new unified request builder consolidates all request matching into a single, intuitive interface:
+### Request Matching
 
 **Body Patterns:**
 - **JSONPath**: `$.account_number` equals `"1234567890"`
-- **Regex**: `^(?!.*routing_number).*$` (negative matching for missing fields)
+- **Regex**: `^(?!.*routing_number).*$` (negative look-ahead)
 - **Contains**: Text substring matching
 - **Exact**: Exact string matching
 - **XPath**: XML path expressions
@@ -351,36 +351,10 @@ The new unified request builder consolidates all request matching into a single,
 - **Exists**: Parameter must be present
 
 **Priority-Based Routing:**
-Multiple endpoints can share the same path with different conditions:
 ```
-Priority 1: /api/memo + account_number=1234567890 → Success (200)
-Priority 2: /api/memo + no routing_number → Error (400) 
-Priority 5: /api/memo + any other request → Default Error (400)
-```
-
-### Legacy JSON Configuration
-
-```json
-{
-  "request": {
-    "method": "POST",
-    "path": "/api/customers/{id}",
-    "headers": {
-      "Content-Type": "application/json",
-      "X-Tenant": "demo"
-    },
-    "queryParams": {
-      "active": "true"
-    },
-    "bodyPatterns": [
-      {
-        "matchType": "JSONPATH",
-        "expr": "$.type",
-        "expected": "premium"
-      }
-    ]
-  }
-}
+Priority 1: /api/memo + account_number=1234567890  →  200 Success
+Priority 2: /api/memo + no routing_number          →  400 Error
+Priority 5: /api/memo + any other request          →  400 Default Error
 ```
 
 ### Response Configuration
@@ -389,10 +363,8 @@ Priority 5: /api/memo + any other request → Default Error (400)
 {
   "response": {
     "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": "{\"id\": \"{{request.pathSegments.[2]}}\", \"name\": \"Customer Name\", \"timestamp\": \"{{now}}\"}",
+    "headers": { "Content-Type": "application/json" },
+    "body": "{\"id\": \"{{request.pathSegments.[2]}}\", \"timestamp\": \"{{now}}\"}",
     "templatingEnabled": true
   }
 }
@@ -421,22 +393,24 @@ Priority 5: /api/memo + any other request → Default Error (400)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MONGO_URI` | `mongodb://localhost:27017/simulator` | MongoDB connection string |
-| `ACTIVE_DATASET` | `default` | Active dataset name (deprecated - use workspaces) |
-| `SERVER_PORT` | `8080` | Spring Boot server port |
-| `AUTH_ENABLED` | `true` | Enable authentication and user management |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/appdb` | PostgreSQL connection URL |
+| `DATABASE_USERNAME` | `appuser` | PostgreSQL username |
+| `DATABASE_PASSWORD` | `apppass` | PostgreSQL password |
+| `SERVER_PORT` | `8080` (admin) / `8090` (mock) | HTTP server port |
+| `AUTH_ENABLED` | `false` | Enable authentication |
+| `MOCK_SERVER_URLS` | _(empty)_ | Comma-separated mock server URLs to notify on mapping changes |
+| `SIMULATOR_NAMESPACE` | `default` | Namespace loaded by a mock-server instance |
+| `WIREMOCK_PORT` | `9999` | WireMock listener port |
 
-### Application Properties
+### Application Properties (admin-console)
 
 ```yaml
 simulator:
-  active-dataset: default  # Deprecated - use workspaces instead
-  wiremock:
-    port: 9999
-    admin-port: 9998
+  active-dataset: default
   auth:
-    enabled: true
-    session-timeout: 3600  # Session timeout in seconds
+    enabled: false
+  mock-server:
+    urls: http://mock-server-default:8090
 ```
 
 ## 🧪 Testing
@@ -444,184 +418,181 @@ simulator:
 ### Run Unit Tests
 
 ```bash
-cd backend
-mvn test
+# Admin Console
+cd admin-console && mvn test
+
+# Mock Server
+cd mock-server && mvn test
 ```
 
 ### Test Coverage
 
-The project includes comprehensive tests for:
-- Service layer logic (DelayService, MappingService)
-- Repository queries and operations
+- Service layer logic (MappingService, UserService)
+- Repository queries (JPQL and native PostgreSQL)
 - REST API endpoints
-- JSON processing and validation
+- JSON processing and pattern matching
 
 ### Manual Testing
 
-1. **Use the Test Panel**: Built-in interface for JSON echo testing
-2. **curl Commands**: Direct API testing via command line
-3. **Postman/Insomnia**: Import OpenAPI specs for structured testing
+1. **Test Panel**: Built-in interface at http://localhost:8080/test
+2. **curl**: See examples in [Demo Endpoints](#-default-seed-mappings) and [API Reference](#-api-reference)
+3. **WireMock Admin**: http://localhost:9999/__admin/mappings
 
 ## 🚀 Deployment
 
-### Docker Production Deployment
+### Docker Compose
 
-1. **Configure environment**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your production settings
-   ```
+```bash
+# Start all services
+docker-compose up -d
 
-2. **Deploy with Docker Compose**:
-   ```bash
-   docker-compose -f docker-compose.yml up -d
-   ```
+# View logs
+docker-compose logs -f
 
-### Kubernetes Deployment
+# Restart a service
+docker-compose restart admin-console
 
-Create ConfigMaps and Deployments for:
-- MongoDB (persistent storage)
-- API Simulator application
-- Ingress for external access
+# Stop everything
+docker-compose down
+
+# Stop and remove volumes (resets database)
+docker-compose down -v
+```
+
+### Adding a Second Mock Server (new namespace)
+
+Add an additional service to `docker-compose.yml`:
+
+```yaml
+  mock-server-teamalpha:
+    build:
+      context: ./mock-server
+      dockerfile: Dockerfile
+    ports:
+      - "9998:9999"
+      - "8091:8090"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/appdb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME:-appuser}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD:-apppass}
+      - SIMULATOR_NAMESPACE=team-alpha
+      - SERVER_PORT=8090
+      - WIREMOCK_PORT=9999
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - simulator-network
+```
+
+Then register it in admin-console:
+```
+MOCK_SERVER_URLS=http://mock-server-default:8090,http://mock-server-teamalpha:8090
+```
 
 ### Health Checks
 
-- **Application Health**: `http://localhost:8080/actuator/health`
-- **MongoDB Health**: Included in Docker Compose healthchecks
-- **WireMock Health**: Verify via admin interface
+- **Admin Console**: http://localhost:8080/actuator/health
+- **Mock Server**: http://localhost:8090/actuator/health
+- **PostgreSQL**: Docker Compose healthcheck via `pg_isready`
+
+### Kubernetes
+
+Deploy admin-console and mock-server as separate Deployments, backed by a shared PostgreSQL instance. Pass `SPRING_DATASOURCE_*` credentials via Secrets, and `MOCK_SERVER_URLS` via a ConfigMap.
 
 ## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **MongoDB Connection Failed**
+1. **PostgreSQL Connection Failed**
    ```
-   Solution: Ensure MongoDB is running and accessible
-   Check: MONGO_URI environment variable
+   Check: SPRING_DATASOURCE_URL, DATABASE_USERNAME, DATABASE_PASSWORD
+   Docker: docker ps | grep postgres
+   Verify: pg_isready -h localhost -U appuser -d appdb
    ```
 
 2. **WireMock Mappings Not Loading**
    ```
-   Solution: Check application logs for mapping errors
-   Action: Use "Refresh WireMock" button in UI
-   API: POST /admin/mappings/refresh
+   Action: Click "Refresh WireMock" in the UI or POST /admin/mappings/refresh
+   Check:  docker-compose logs mock-server-default | grep ERROR
+   Verify: curl http://localhost:9999/__admin/mappings
    ```
 
-3. **WireMock Admin Shows No Objects**
+3. **Mock Server Not Receiving Updates**
    ```
-   Solution: Mappings need to be manually loaded on startup
-   Action: Use "Refresh WireMock" button or restart application
-   Check: http://localhost:9999/__admin/mappings
+   Check: MOCK_SERVER_URLS is set correctly in admin-console environment
+   Test:  curl -X POST http://localhost:8090/refresh
+   Logs:  docker-compose logs admin-console | grep "Notifying mock server"
    ```
 
 4. **Port Conflicts**
    ```
-   Solution: Modify ports in docker-compose.yml or application.yml
-   Defaults: 8080 (app), 9999 (wiremock), 27017 (mongo)
+   Ports: 8080 (admin UI), 9999 (WireMock), 8090 (mock management), 5432 (PostgreSQL)
+   Fix:   Modify host port mappings in docker-compose.yml
+   Check: lsof -i :8080
    ```
 
-5. **Unified Conditions Not Loading**
+5. **Priority-Based Routing Issues**
    ```
-   Solution: Check browser console for JavaScript errors
-   Action: Reload page, verify conditions display in Request Conditions section
-   ```
-
-6. **Priority-Based Routing Issues**
-   ```
-   Solution: Lower priority number = higher precedence
-   Example: Priority 1 matches before Priority 5
-   Check: WireMock processes by priority order
+   Lower number = higher precedence (Priority 1 wins over Priority 5)
+   Check: GET http://localhost:9999/__admin/mappings (shows WireMock's loaded stubs)
    ```
 
-7. **Regex Patterns Not Working**
+6. **Authentication Issues**
    ```
-   Solution: Test regex patterns in unified interface text area
-   Example: ^(?!.*routing_number).*$ for negative matching
-   Tool: Use online regex testers for validation
-   ```
-
-8. **Template Rendering Issues**
-   ```
-   Solution: Verify Handlebars syntax in response bodies
-   Check: Enable templating checkbox for dynamic responses
+   Default credentials: admin/admin123 or demo/demo123
+   Check: AUTH_ENABLED environment variable
+   Action: Clear browser cookies and re-login
    ```
 
-9. **Authentication Issues**
+7. **Session Timeout**
    ```
-   Solution: Check login credentials and session
-   Action: Use admin/admin123 or demo/demo123
-   Check: Ensure AUTH_ENABLED=true in configuration
+   Default: 3600 seconds (1 hour)
+   Action: Re-login
    ```
 
-10. **Workspace Access Issues**
+8. **Regex Patterns Not Matching**
+   ```
+   Test your regex at https://regex101.com
+   Enable DEBUG logging: logging.level.com.simulator=DEBUG
+   Check WireMock requests: http://localhost:9999/__admin/requests
+   ```
+
+9. **Template Rendering Issues**
+   ```
+   Verify Handlebars syntax in response body
+   Ensure "Enable Templating" is checked on the mapping
+   ```
+
+10. **Workspace Access Denied**
     ```
-    Solution: Check user's workspace permissions
-    Action: Admin can assign users to workspaces
-    API: GET /auth/current to check current session
-    ```
-
-11. **Session Timeout**
-    ```
-    Solution: Re-login if session expires
-    Check: Default session timeout is 3600 seconds (1 hour)
-    Config: Adjust session-timeout in application.yml
+    Check user's workspace membership via Admin Panel
+    API: GET /auth/current to see current session and namespace
     ```
 
 ### Logging
 
-- **Application Logs**: Check Docker logs or console output
-- **MongoDB Logs**: Available in Docker container logs
-- **WireMock Logs**: Integrated with application logging
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f admin-console
+docker-compose logs -f mock-server-default
+
+# Increase log level (application.yml)
+logging:
+  level:
+    com.simulator: DEBUG
+```
 
 ### Performance Tuning
 
-- **MongoDB Indexing**: Automatic indexes on dataset and enabled fields
-- **Memory Settings**: Configure JVM heap size for larger datasets
-- **Connection Pooling**: MongoDB connection pool sizing
-
-## 📚 Documentation
-
-### User Documentation
-- **README.md** (this file): Quick start guide, features, and basic usage
-- **API Reference**: See [API Reference](#-api-reference) section above
-
-### Technical Documentation
-- **CLAUDE.md**: Comprehensive technical documentation for developers and AI assistants
-  - Complete architecture overview
-  - Detailed API specifications
-  - Database schema
-  - Development workflows
-  - Troubleshooting guides
-  - Performance optimization tips
-
-### Additional Resources
-- **Code Comments**: Inline documentation in source code
-- **Example Mappings**: Pre-configured demo endpoints included
-- **Test Panel**: Interactive testing interface at http://localhost:8080/test
-
-## 🔮 Future Enhancements
-
-- [ ] API usage analytics and metrics dashboard
-- [ ] OpenAPI/Swagger spec import
-- [ ] Webhook simulation capabilities
-- [ ] Request/response transformation pipelines
-- [ ] A/B testing support with multiple response variants
-- [ ] Condition validation with real-time testing
-- [ ] Template editor with syntax highlighting
-- [ ] Bulk condition operations (copy, move, delete)
-- [ ] Advanced regex builder with pattern suggestions
-- [ ] Workspace-level statistics and reporting
-- [ ] User activity audit logs
-- [ ] Backup and restore functionality
-- [ ] LDAP/SSO integration for enterprise users
-
-## 📄 License
-
-This project is licensed under the MIT License.
+- PostgreSQL indexes are created automatically by `db/schema.sql` on `namespace`, `enabled`, and `priority` columns
+- Increase JVM heap: add `JAVA_OPTS=-Xmx2g` to Docker environment
+- Tune PostgreSQL connections via `?maxPoolSize=50` in the JDBC URL
 
 ## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
 
 1. **Fork the repository**
 2. **Create a feature branch**
@@ -629,65 +600,29 @@ We welcome contributions! Here's how you can help:
    git checkout -b feature/amazing-feature
    ```
 3. **Make your changes**
-   - Follow existing code style and conventions
+   - Follow existing code style (4-space indent, 120-char line limit)
    - Add tests for new functionality
    - Update documentation as needed
-4. **Commit your changes**
+4. **Commit and push**
    ```bash
    git commit -m 'Add amazing feature'
-   ```
-5. **Push to your branch**
-   ```bash
    git push origin feature/amazing-feature
    ```
-6. **Open a Pull Request**
-   - Describe your changes clearly
-   - Reference any related issues
-   - Ensure all tests pass
+5. **Open a Pull Request**
 
 ### Development Setup
 
-See [CLAUDE.md - Development Workflow](CLAUDE.md#development-workflow) for detailed setup instructions.
+See [CLAUDE.md](CLAUDE.md) for full architecture details, database schema, and development workflow.
 
-### Code of Conduct
+## 📄 License
 
-Please be respectful and constructive in all interactions. We aim to maintain a welcoming community for all contributors.
-
-## 📞 Support
-
-### Getting Help
-- **Issues**: Report bugs and request features via [GitHub Issues](../../issues)
-- **Documentation**:
-  - User guide: This README
-  - Technical docs: [CLAUDE.md](CLAUDE.md)
-  - Inline code documentation
-- **Community**: Discussions and Q&A via [GitHub Discussions](../../discussions)
-
-### Reporting Bugs
-
-When reporting bugs, please include:
-- API Simulator version
-- Java version (`java -version`)
-- MongoDB version
-- Steps to reproduce the issue
-- Expected vs. actual behavior
-- Relevant logs or error messages
-
-### Feature Requests
-
-We love hearing about new feature ideas! Please:
-- Check existing issues first to avoid duplicates
-- Describe the use case and benefit
-- Provide examples if possible
+This project is licensed under the MIT License.
 
 ## 👥 Acknowledgments
 
-Built with these amazing technologies:
-- [Spring Boot](https://spring.io/projects/spring-boot) - Application framework
-- [WireMock](https://wiremock.org/) - API simulation engine
-- [htmx](https://htmx.org/) - Dynamic HTML interactions
-- [TailwindCSS](https://tailwindcss.com/) - Utility-first CSS
-- [MongoDB](https://www.mongodb.com/) - NoSQL database
-
----
-
+Built with these technologies:
+- [Spring Boot](https://spring.io/projects/spring-boot) — Application framework
+- [WireMock](https://wiremock.org/) — API simulation engine
+- [PostgreSQL](https://www.postgresql.org/) — Relational database
+- [htmx](https://htmx.org/) — Dynamic HTML interactions
+- [TailwindCSS](https://tailwindcss.com/) — Utility-first CSS
