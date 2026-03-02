@@ -1,0 +1,42 @@
+server:
+  port: ${SERVER_PORT:8090}
+
+spring:
+  application:
+    name: api-simulator-mock-server
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/appdb}
+    username: ${DATABASE_USERNAME:appuser}
+    password: ${DATABASE_PASSWORD:apppass}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+
+logging:
+  level:
+    com.simulator: DEBUG
+    com.github.tomakehurst.wiremock: INFO
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+simulator:
+  namespace: ${SIMULATOR_NAMESPACE:default}
+  wiremock:
+    port: ${WIREMOCK_PORT:9999}
+    admin-port: ${WIREMOCK_ADMIN_PORT:9998}

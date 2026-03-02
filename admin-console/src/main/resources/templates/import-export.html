@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout}">
+<head>
+    <title>Import/Export - API Simulator</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-900">Import/Export Mappings</h1>
+                <a th:href="@{/}" class="text-blue-600 hover:text-blue-800">← Back to Dashboard</a>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Import Section -->
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Import Mappings</h2>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Upload a JSON file containing mapping configurations. The file should contain an array of mapping objects.
+                        </p>
+                    </div>
+
+                    <form hx-post="/admin/import" 
+                          hx-encoding="multipart/form-data"
+                          hx-target="#import-result"
+                          hx-indicator="#import-spinner"
+                          class="space-y-4">
+                        
+                        <div>
+                            <label for="import-file" class="block text-sm font-medium text-gray-700 mb-2">
+                                Select JSON File
+                            </label>
+                            <input type="file" 
+                                   id="import-file" 
+                                   name="file" 
+                                   accept=".json,application/json" 
+                                   required
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <button type="submit" 
+                                class="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center">
+                            <div id="import-spinner" class="htmx-indicator spinner mr-2"></div>
+                            Import Mappings
+                        </button>
+                    </form>
+
+                    <div id="import-result" class="min-h-24"></div>
+
+                    <!-- Sample JSON Structure -->
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-md font-semibold text-gray-800 mb-2">Expected JSON Structure</h3>
+                        <pre class="text-xs text-gray-700 overflow-x-auto"><code>[
+  {
+    "name": "Get Customer by ID",
+    "priority": 5,
+    "request": {
+      "method": "GET",
+      "path": "/api/customers/{id}",
+      "headers": {
+        "X-Tenant": "demo"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": "{\"id\":\"123\",\"name\":\"Customer\"}",
+      "templatingEnabled": true
+    },
+    "delays": {
+      "mode": "fixed",
+      "fixedMs": 100,
+      "errorRatePercent": 0
+    },
+    "enabled": true,
+    "tags": ["api", "customer"]
+  }
+]</code></pre>
+                    </div>
+                </div>
+
+                <!-- Export Section -->
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Export Mappings</h2>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Download all current mappings as a JSON file for backup or sharing with other instances.
+                        </p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <a href="/admin/export" 
+                           download="api-mappings.json"
+                           class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Export Current Mappings
+                        </a>
+
+                        <div class="text-center">
+                            <p class="text-sm text-gray-500">
+                                This will download a JSON file containing all mappings in the current dataset.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Export Info -->
+                    <div class="bg-blue-50 rounded-lg p-4">
+                        <h3 class="text-md font-semibold text-blue-900 mb-2">Export Information</h3>
+                        <ul class="text-sm text-blue-800 space-y-1">
+                            <li>• All mappings from the active dataset will be included</li>
+                            <li>• File will be in JSON format</li>
+                            <li>• Includes all configuration: requests, responses, delays, etc.</li>
+                            <li>• Can be imported into other API Simulator instances</li>
+                            <li>• Perfect for backup and version control</li>
+                        </ul>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="space-y-3">
+                        <h3 class="text-md font-semibold text-gray-800">Quick Actions</h3>
+                        <div class="space-y-2">
+                            <button onclick="downloadSample()" 
+                                    class="w-full bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-left">
+                                Download Sample Mappings JSON
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dataset Management (Future Enhancement) -->
+            <div class="mt-12 pt-8 border-t">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Dataset Management</h2>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-yellow-800">Current Dataset</h3>
+                            <div class="mt-2 text-sm text-yellow-700">
+                                <p>You are currently working with the <strong>"default"</strong> dataset. All imports will be added to this dataset, and exports will only include mappings from this dataset.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Handle import results
+            document.body.addEventListener('htmx:afterRequest', function(evt) {
+                if (evt.detail.target.id === 'import-result') {
+                    try {
+                        const response = JSON.parse(evt.detail.xhr.responseText);
+                        let html = '<div class="rounded-lg p-4 ';
+                        
+                        if (response.success) {
+                            html += 'bg-green-50 border border-green-200">';
+                            html += '<div class="flex"><div class="flex-shrink-0">';
+                            html += '<svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">';
+                            html += '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>';
+                            html += '</div><div class="ml-3">';
+                            html += '<h3 class="text-sm font-medium text-green-800">Import Successful</h3>';
+                            html += '<div class="mt-2 text-sm text-green-700">';
+                            html += '<p>' + response.message + '</p>';
+                            html += '</div></div></div></div>';
+                        } else {
+                            html += 'bg-red-50 border border-red-200">';
+                            html += '<div class="flex"><div class="flex-shrink-0">';
+                            html += '<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">';
+                            html += '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>';
+                            html += '</div><div class="ml-3">';
+                            html += '<h3 class="text-sm font-medium text-red-800">Import Failed</h3>';
+                            html += '<div class="mt-2 text-sm text-red-700">';
+                            html += '<p>' + response.message + '</p>';
+                            html += '</div></div></div></div>';
+                        }
+                        
+                        evt.detail.target.innerHTML = html;
+                    } catch (e) {
+                        evt.detail.target.innerHTML = 
+                            '<div class="bg-red-50 border border-red-200 rounded-lg p-4">' +
+                            '<p class="text-red-800">Error processing response</p></div>';
+                    }
+                }
+            });
+
+            function downloadSample() {
+                const sampleMappings = [
+                    {
+                        name: "Get Hello World",
+                        priority: 5,
+                        request: {
+                            method: "GET",
+                            path: "/hello",
+                            headers: {},
+                            queryParams: {}
+                        },
+                        response: {
+                            status: 200,
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: '{"message": "Hello World", "timestamp": "{{now}}"}',
+                            templatingEnabled: true
+                        },
+                        delays: {
+                            mode: "fixed",
+                            fixedMs: 100,
+                            errorRatePercent: 0
+                        },
+                        enabled: true,
+                        tags: ["sample", "hello"]
+                    },
+                    {
+                        name: "Create Order",
+                        priority: 5,
+                        request: {
+                            method: "POST",
+                            path: "/orders",
+                            headers: {
+                                "Content-Type": "application/json"
+                            }
+                        },
+                        response: {
+                            status: 201,
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: '{"id": "{{randomValue type=\\"UUID\\"}}", "status": "created", "data": {{request.body}}}',
+                            templatingEnabled: true
+                        },
+                        delays: {
+                            mode: "variable",
+                            variableMinMs: 100,
+                            variableMaxMs: 500,
+                            errorRatePercent: 0
+                        },
+                        enabled: true,
+                        tags: ["sample", "order"]
+                    }
+                ];
+
+                const blob = new Blob([JSON.stringify(sampleMappings, null, 2)], {
+                    type: 'application/json'
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'sample-mappings.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        </script>
+    </div>
+</body>
+</html>

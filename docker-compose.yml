@@ -1,38 +1,43 @@
 version: '3.8'
 
 services:
-  mongo:
-    image: mongo:7.0
-    container_name: api-simulator-mongo
+  postgres:
+    image: postgres:16
+    container_name: api-simulator-postgres
     ports:
-      - "27017:27017"
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppass
     volumes:
-      - mongo_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     networks:
       - simulator-network
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-  backend:
-    build: 
-      context: ./backend
+  admin-console:
+    build:
+      context: ./admin-console
       dockerfile: Dockerfile
-    container_name: api-simulator-backend
+    container_name: api-simulator-admin-console
     ports:
       - "8080:8080"
-      - "9999:9999"  # WireMock port
     environment:
-      - MONGO_URI=mongodb://mongo:27017/simulator
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/appdb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME:-appuser}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD:-apppass}
       - ACTIVE_DATASET=default
-      - SERVER_PORT=8080
       - AUTH_ENABLED=false
-      - SPRING_PROFILES_ACTIVE=docker
+      - MOCK_SERVER_URLS=http://mock-server-default:8090
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
     networks:
       - simulator-network
@@ -44,8 +49,37 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  mock-server-default:
+    build:
+      context: ./mock-server
+      dockerfile: Dockerfile
+    container_name: api-simulator-mock-server-default
+    ports:
+      - "9999:9999"   # WireMock — simulated API endpoints
+      - "8090:8090"   # Spring Boot management (refresh, status, health)
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/appdb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME:-appuser}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD:-apppass}
+      - SIMULATOR_NAMESPACE=default
+      - SERVER_PORT=8090
+      - WIREMOCK_PORT=9999
+      - WIREMOCK_ADMIN_PORT=9998
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - simulator-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
 volumes:
-  mongo_data:
+  postgres_data:
     driver: local
 
 networks:

@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout}">
+<head>
+    <title th:text="(${isEdit} ? 'Edit' : 'New') + ' Mapping - API Simulator'">New Mapping - API Simulator</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-900" th:text="${isEdit} ? 'Edit Mapping' : 'Create New Mapping'">
+                    Create New Mapping
+                </h1>
+                <a th:href="@{/}" class="text-blue-600 hover:text-blue-800">← Back to Dashboard</a>
+            </div>
+
+            <form method="POST" 
+                  th:action="${isEdit} ? @{'/admin/mappings/' + ${mapping.id} + '/form'} : @{/admin/mappings/form}"
+                  class="space-y-6">
+                
+                <!-- No method override needed - using POST for both create and update -->
+
+                <div id="form-result"></div>
+
+                <!-- Basic Information -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Mapping Name</label>
+                        <input type="text" id="name" name="name" required
+                               th:value="${mapping.name}"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="priority" class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                        <input type="number" id="priority" name="priority" min="1" max="10"
+                               th:value="${mapping.priority} ?: 5"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="enabled" class="flex items-center space-x-2">
+                            <input type="checkbox" id="enabled" name="enabled" 
+                                   th:checked="${mapping.enabled} ?: true"
+                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm font-medium text-gray-700">Enabled</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label for="tags" class="block text-sm font-medium text-gray-700 mb-2">Tags (comma-separated)</label>
+                        <input type="text" id="tags" name="tags"
+                               th:value="${mapping.tags} ? ${#strings.listJoin(mapping.tags, ', ')} : ''"
+                               placeholder="api, v1, customer"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <!-- Request Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Request Configuration</h3>
+
+                    <!-- Endpoint Type Selection -->
+                    <div class="mb-6">
+                        <label for="endpointType" class="block text-sm font-medium text-gray-700 mb-2">Endpoint Type</label>
+                        <select id="endpointType" name="endpointType" onchange="toggleEndpointType()" required
+                                class="w-full md:w-64 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="REST" th:selected="${mapping.endpointType?.name() == 'REST' || mapping.endpointType == null}">REST API</option>
+                            <option value="GRAPHQL" th:selected="${mapping.endpointType?.name() == 'GRAPHQL'}">GraphQL</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Choose whether this endpoint simulates REST API or GraphQL</p>
+                    </div>
+
+                    <!-- REST Configuration -->
+                    <div id="restConfig" class="rest-config">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="method" class="block text-sm font-medium text-gray-700 mb-2">HTTP Method</label>
+                            <select id="method" name="requestMethod" required
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="GET" th:selected="${mapping.request?.method == 'GET'}">GET</option>
+                                <option value="POST" th:selected="${mapping.request?.method == 'POST'}">POST</option>
+                                <option value="PUT" th:selected="${mapping.request?.method == 'PUT'}">PUT</option>
+                                <option value="DELETE" th:selected="${mapping.request?.method == 'DELETE'}">DELETE</option>
+                                <option value="PATCH" th:selected="${mapping.request?.method == 'PATCH'}">PATCH</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="pathMatchingMode" class="block text-sm font-medium text-gray-700 mb-2">Path Matching Mode</label>
+                            <select id="pathMatchingMode" name="pathMatchingMode" onchange="togglePathMatchingFields()"
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="simple">Simple Path (backward compatible)</option>
+                                <option value="advanced">Advanced Path Patterns</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Simple Path (Backward Compatible) -->
+                    <div id="simplePathDiv" class="mt-4">
+                        <label for="path" class="block text-sm font-medium text-gray-700 mb-2">Path</label>
+                        <input type="text" id="path" name="requestPath" required
+                               th:value="${mapping.request?.path}"
+                               placeholder="/api/customers/{id}"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Supports placeholders like {id} and wildcards like *</p>
+                    </div>
+
+                    <!-- Advanced Path Patterns -->
+                    <div id="advancedPathDiv" class="mt-4" style="display: none;">
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <h4 class="text-sm font-medium text-gray-900 mb-3">Advanced Path Pattern Configuration</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label for="pathMatchType" class="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
+                                    <select id="pathMatchType" name="pathMatchType"
+                                            class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="EXACT">Exact Match</option>
+                                        <option value="WILDCARD">Wildcard (* and ?)</option>
+                                        <option value="REGEX">Regular Expression</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="pathPattern" class="block text-sm font-medium text-gray-700 mb-1">Pattern</label>
+                                    <input type="text" id="pathPattern" name="pathPattern"
+                                           placeholder="/api/users/*"
+                                           class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div class="flex items-center">
+                                    <label for="pathIgnoreCase" class="flex items-center space-x-2">
+                                        <input type="checkbox" id="pathIgnoreCase" name="pathIgnoreCase"
+                                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <span class="text-sm font-medium text-gray-700">Ignore Case</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <p class="text-xs text-blue-600">
+                                    <strong>Examples:</strong><br>
+                                    • Exact: /api/users/123<br>
+                                    • Wildcard: /api/users/* (matches /api/users/123, /api/users/456/profile)<br>
+                                    • Regex: /api/users/\d+ (matches /api/users/123, /api/users/456)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Unified Request Conditions -->
+                    <div class="mt-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <label class="block text-sm font-medium text-gray-700">Request Conditions</label>
+                            <div class="flex items-center space-x-3">
+                                <select id="conditionType" class="border border-gray-300 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="body">Body Pattern</option>
+                                    <option value="header">Header Pattern</option>
+                                    <option value="query">Query Parameter</option>
+                                    <option value="path">Path Pattern</option>
+                                </select>
+                                <button type="button" onclick="addCondition()" class="inline-flex items-center px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                    </svg>
+                                    Add Condition
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Unified Conditions List -->
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <div id="conditionsList" class="space-y-3">
+                                <!-- Dynamic conditions will be added here -->
+                                <div class="text-center text-gray-500 text-sm py-4" id="noConditionsMessage">
+                                    No conditions added yet. Click "Add Condition" to create request matching rules.
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p class="text-xs text-blue-700 mb-2">
+                                    <strong>Condition Types:</strong>
+                                </p>
+                                <ul class="text-xs text-blue-600 space-y-1">
+                                    <li><strong>Body Pattern:</strong> Match content in request body (CONTAINS, REGEX, JSONPATH, XPATH)</li>
+                                    <li><strong>Header Pattern:</strong> Match HTTP headers (EXACT, REGEX, CONTAINS, EXISTS)</li>
+                                    <li><strong>Query Parameter:</strong> Match URL query parameters (EXACT, REGEX, CONTAINS, EXISTS)</li>
+                                    <li><strong>Path Pattern:</strong> Advanced path matching (EXACT, REGEX, WILDCARD)</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Hidden fields for backward compatibility -->
+                        <textarea id="headers" name="requestHeaders" style="display: none;" th:text="${requestHeadersJson}"></textarea>
+                        <textarea id="queryParams" name="requestQueryParams" style="display: none;" th:text="${requestQueryParamsJson}"></textarea>
+                        <!-- bodyPatternsJson, headerPatternsJson and queryParamPatternsJson are defined later with Thymeleaf th:utext for proper JSON handling -->
+                        
+                        <!-- Hidden inputs for path patterns -->
+                        <input type="hidden" id="pathMatchingMode" name="pathMatchingMode" value="simple">
+                        <input type="hidden" id="pathMatchType" name="pathMatchType" value="EXACT">
+                        <input type="hidden" id="pathPattern" name="pathPattern" value="">
+                        <input type="hidden" id="pathIgnoreCase" name="pathIgnoreCase" value="false">
+                        <input type="hidden" id="headerMatchingMode" name="headerMatchingMode" value="simple">
+                        <input type="hidden" id="queryParamMatchingMode" name="queryParamMatchingMode" value="simple">
+
+                    </div>
+
+                </div>
+
+                <!-- Response Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Response Configuration</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="status" class="block text-sm font-medium text-gray-700 mb-2">HTTP Status</label>
+                            <input type="number" id="status" name="responseStatus" min="100" max="599"
+                                   th:value="${mapping.response?.status} ?: 200"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="templating" class="flex items-center space-x-2">
+                                <input type="checkbox" id="templating" name="templatingEnabled"
+                                       th:checked="${mapping.response?.templatingEnabled}"
+                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm font-medium text-gray-700">Enable Handlebars Templating</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="responseHeaders" class="block text-sm font-medium text-gray-700 mb-2">
+                            Response Headers (JSON format)
+                        </label>
+                        <textarea id="responseHeaders" name="responseHeaders" rows="3"
+                                  placeholder='{"Content-Type": "application/json", "X-Custom": "value"}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  th:text="${responseHeadersJson}"></textarea>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="body" class="block text-sm font-medium text-gray-700 mb-2">Response Body (JSON only)</label>
+                        <textarea id="body" name="responseBody" rows="8" required
+                                  placeholder='{"id": "{{request.pathSegments.[2]}}", "name": "Customer Name", "active": true}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  th:text="${mapping.response?.body}"></textarea>
+                    </div>
+                </div>
+
+                <!-- Delay Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Delay & Chaos Configuration</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label for="delayMode" class="block text-sm font-medium text-gray-700 mb-2">Delay Mode</label>
+                            <select id="delayMode" name="delayMode"
+                                    onchange="toggleDelayFields()"
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="fixed" th:selected="${mapping.delays?.mode == 'fixed'}">Fixed</option>
+                                <option value="variable" th:selected="${mapping.delays?.mode == 'variable'}">Variable</option>
+                            </select>
+                        </div>
+                        <div id="fixedDelayDiv">
+                            <label for="fixedMs" class="block text-sm font-medium text-gray-700 mb-2">Fixed Delay (ms)</label>
+                            <input type="number" id="fixedMs" name="fixedMs" min="0"
+                                   th:value="${mapping.delays?.fixedMs} ?: 0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div id="variableDelayDiv" style="display: none;">
+                            <label for="variableMinMs" class="block text-sm font-medium text-gray-700 mb-2">Min Delay (ms)</label>
+                            <input type="number" id="variableMinMs" name="variableMinMs" min="0"
+                                   th:value="${mapping.delays?.variableMinMs} ?: 100"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
+                            <label for="variableMaxMs" class="block text-sm font-medium text-gray-700 mb-2">Max Delay (ms)</label>
+                            <input type="number" id="variableMaxMs" name="variableMaxMs" min="0"
+                                   th:value="${mapping.delays?.variableMaxMs} ?: 500"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="errorRatePercent" class="block text-sm font-medium text-gray-700 mb-2">Error Rate (%)</label>
+                            <input type="number" id="errorRatePercent" name="errorRatePercent" min="0" max="100"
+                                   th:value="${mapping.delays?.errorRatePercent} ?: 0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="errorStatus" class="block text-sm font-medium text-gray-700 mb-2">Error Status</label>
+                            <input type="number" id="errorStatus" name="errorStatus" min="400" max="599"
+                                   th:value="${mapping.delays?.errorResponse?.status} ?: 500"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label for="errorBody" class="block text-sm font-medium text-gray-700 mb-2">Error Response Body (JSON)</label>
+                        <textarea id="errorBody" name="errorBody" rows="3"
+                                  placeholder='{"error": "Service temporarily unavailable", "code": 503}'
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  th:text="${mapping.delays?.errorResponse?.body}"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Conditional Responses Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Conditional Responses</h3>
+                    <p class="text-sm text-gray-600 mb-4">Configure responses based on request ID headers for testing different scenarios.</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="conditionalResponsesEnabled" class="flex items-center space-x-2">
+                                <input type="checkbox" id="conditionalResponsesEnabled" name="conditionalResponsesEnabled" 
+                                       th:checked="${mapping.response?.conditionalResponses?.enabled}"
+                                       onchange="toggleConditionalResponses()"
+                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm font-medium text-gray-700">Enable Conditional Responses</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label for="requestIdHeader" class="block text-sm font-medium text-gray-700 mb-2">Request ID Header Name</label>
+                            <input type="text" id="requestIdHeader" name="requestIdHeader"
+                                   th:value="${mapping.response?.conditionalResponses?.requestIdHeader} ?: 'X-Request-ID'"
+                                   placeholder="X-Request-ID"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div id="conditionalResponsesConfig" class="mt-4" style="display: none;">
+                        <div class="flex items-center justify-between mb-4">
+                            <label class="block text-sm font-medium text-gray-700">
+                                Conditional Response Mappings
+                            </label>
+                            <button type="button" onclick="addConditionalResponseMapping()" 
+                                    class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition-colors flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Add Mapping
+                            </button>
+                        </div>
+                        
+                        <div id="conditionalMappingsList" class="space-y-3">
+                            <!-- Dynamic conditional mappings will be added here -->
+                        </div>
+                        
+                        <!-- Hidden textarea for form submission -->
+                        <textarea id="conditionalResponsesJson" name="conditionalResponsesJson" style="display: none;"
+                                  th:text="${conditionalResponsesJson}"></textarea>
+                        
+                        <!-- Hidden inputs for advanced pattern data -->
+                        <input type="hidden" id="pathMatchingModeHidden" th:value="${pathMatchingMode}">
+                        <input type="hidden" id="pathMatchTypeHidden" th:value="${pathMatchType}">
+                        <input type="hidden" id="pathPatternHidden" th:value="${pathPattern}">
+                        <input type="hidden" id="pathIgnoreCaseHidden" th:value="${pathIgnoreCase}">
+                        <input type="hidden" id="headerMatchingModeHidden" th:value="${headerMatchingMode}">
+                        <textarea id="headerPatternsJson" name="headerPatternsJson" style="display: none;" th:utext="${headerPatternsJson}"></textarea>
+                        <input type="hidden" id="queryParamMatchingModeHidden" th:value="${queryParamMatchingMode}">
+                        <textarea id="queryParamPatternsJson" name="queryParamPatternsJson" style="display: none;" th:utext="${queryParamPatternsJson}"></textarea>
+                        <textarea id="bodyPatternsJson" name="bodyPatternsJson" style="display: none;" th:utext="${bodyPatternsJson}"></textarea>
+                        
+                        <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p class="text-xs text-blue-700 mb-2">
+                                <strong>How it works:</strong> When a request includes the specified header with a matching Request ID, 
+                                the corresponding status and response body will be returned instead of the default response.
+                            </p>
+                            <p class="text-xs text-blue-600">
+                                <strong>Example:</strong> Send <code>X-Request-ID: success-200</code> to get a 200 success response, 
+                                or <code>X-Request-ID: error-400</code> to simulate a 400 error.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Setup Buttons -->
+                    <div id="conditionalResponsesActions" class="mt-4" style="display: none;">
+                        <div class="flex space-x-2">
+                            <button type="button" onclick="useDefaultConditionalResponses()" 
+                                    class="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors">
+                                Use Default Mappings
+                            </button>
+                            <button type="button" onclick="clearConditionalResponses()" 
+                                    class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="flex items-center justify-between pt-6 border-t">
+                    <a th:href="@{/}" class="text-gray-600 hover:text-gray-800">Cancel</a>
+                    <div class="space-x-4">
+                        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                            <span th:text="${isEdit} ? 'Update Mapping' : 'Create Mapping'">Create Mapping</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <script>
+            
+            // Counters for dynamic elements
+            let headerPatternCounter = 0;
+            let queryParamPatternCounter = 0;
+            let bodyPatternCounter = 0;
+
+            function toggleDelayFields() {
+                const mode = document.getElementById('delayMode').value;
+                const fixedDiv = document.getElementById('fixedDelayDiv');
+                const variableDiv = document.getElementById('variableDelayDiv');
+                
+                if (mode === 'variable') {
+                    fixedDiv.style.display = 'none';
+                    variableDiv.style.display = 'block';
+                } else {
+                    fixedDiv.style.display = 'block';
+                    variableDiv.style.display = 'none';
+                }
+            }
+
+            function togglePathMatchingFields() {
+                const modeElement = document.getElementById('pathMatchingMode');
+                if (!modeElement) return; // Element doesn't exist, skip
+                
+                const mode = modeElement.value;
+                const simpleDiv = document.getElementById('simplePathDiv');
+                const advancedDiv = document.getElementById('advancedPathDiv');
+                const pathElement = document.getElementById('path');
+                
+                // Only proceed if elements exist (defensive programming)
+                if (simpleDiv && advancedDiv && pathElement) {
+                    if (mode === 'advanced') {
+                        simpleDiv.style.display = 'none';
+                        advancedDiv.style.display = 'block';
+                        pathElement.removeAttribute('required');
+                    } else {
+                        simpleDiv.style.display = 'block';
+                        advancedDiv.style.display = 'none';
+                        pathElement.setAttribute('required', 'required');
+                    }
+                }
+            }
+
+            function toggleHeaderMatchingFields() {
+                const modeElement = document.getElementById('headerMatchingMode');
+                if (!modeElement) return; // Element doesn't exist, skip
+                
+                const mode = modeElement.value;
+                const simpleDiv = document.getElementById('simpleHeadersDiv');
+                const advancedDiv = document.getElementById('advancedHeadersDiv');
+                
+                // Only proceed if elements exist (defensive programming)
+                if (simpleDiv && advancedDiv) {
+                    if (mode === 'advanced') {
+                        simpleDiv.style.display = 'none';
+                        advancedDiv.style.display = 'block';
+                    } else {
+                        simpleDiv.style.display = 'block';
+                        advancedDiv.style.display = 'none';
+                    }
+                }
+            }
+
+            function toggleQueryParamMatchingFields() {
+                const modeElement = document.getElementById('queryParamMatchingMode');
+                if (!modeElement) return; // Element doesn't exist, skip
+                
+                const mode = modeElement.value;
+                const simpleDiv = document.getElementById('simpleQueryParamsDiv');
+                const advancedDiv = document.getElementById('advancedQueryParamsDiv');
+                
+                // Only proceed if elements exist (defensive programming)
+                if (simpleDiv && advancedDiv) {
+                    if (mode === 'advanced') {
+                        simpleDiv.style.display = 'none';
+                        advancedDiv.style.display = 'block';
+                    } else {
+                        simpleDiv.style.display = 'block';
+                        advancedDiv.style.display = 'none';
+                    }
+                }
+            }
+
+            function addHeaderPattern(name = '', matchType = 'EXACT', pattern = '', ignoreCase = false) {
+                headerPatternCounter++;
+                const patternsList = document.getElementById('headerPatternsList');
+                
+                const patternDiv = document.createElement('div');
+                patternDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                patternDiv.id = `headerPattern-${headerPatternCounter}`;
+                
+                patternDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h5 class="text-sm font-medium text-gray-900">Header Pattern #${headerPatternCounter}</h5>
+                        <button type="button" onclick="removeHeaderPattern('headerPattern-${headerPatternCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Header Name</label>
+                            <input type="text" class="header-pattern-name w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${name}" placeholder="X-Custom-Header" onchange="updateHeaderPatternsJson()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="header-pattern-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    onchange="updateHeaderPatternsJson()">
+                                <option value="EXACT" ${matchType === 'EXACT' ? 'selected' : ''}>Exact</option>
+                                <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                                <option value="EXISTS" ${matchType === 'EXISTS' ? 'selected' : ''}>Exists</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Pattern</label>
+                            <input type="text" class="header-pattern-pattern w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${pattern}" placeholder="Bearer.*" onchange="updateHeaderPatternsJson()">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="header-pattern-ignore-case rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateHeaderPatternsJson()">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                
+                patternsList.appendChild(patternDiv);
+                updateHeaderPatternsJson();
+            }
+
+            function removeHeaderPattern(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                if (patternDiv) {
+                    patternDiv.remove();
+                    updateHeaderPatternsJson();
+                }
+            }
+
+            function updateHeaderPatternsJson() {
+                const patterns = {};
+                const patternDivs = document.querySelectorAll('[id^="headerPattern-"]');
+                
+                patternDivs.forEach(div => {
+                    const name = div.querySelector('.header-pattern-name').value.trim();
+                    const matchType = div.querySelector('.header-pattern-match-type').value;
+                    const pattern = div.querySelector('.header-pattern-pattern').value.trim();
+                    const ignoreCase = div.querySelector('.header-pattern-ignore-case').checked;
+                    
+                    if (name) {
+                        patterns[name] = {
+                            matchType: matchType,
+                            pattern: pattern,
+                            ignoreCase: ignoreCase
+                        };
+                    }
+                });
+                
+                document.getElementById('headerPatternsJson').value = JSON.stringify(patterns);
+            }
+
+            function addQueryParamPattern(name = '', matchType = 'EXACT', pattern = '', ignoreCase = false) {
+                queryParamPatternCounter++;
+                const patternsList = document.getElementById('queryParamPatternsList');
+                
+                const patternDiv = document.createElement('div');
+                patternDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                patternDiv.id = `queryParamPattern-${queryParamPatternCounter}`;
+                
+                patternDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h5 class="text-sm font-medium text-gray-900">Query Param Pattern #${queryParamPatternCounter}</h5>
+                        <button type="button" onclick="removeQueryParamPattern('queryParamPattern-${queryParamPatternCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Parameter Name</label>
+                            <input type="text" class="query-param-pattern-name w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${name}" placeholder="userId" onchange="updateQueryParamPatternsJson()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="query-param-pattern-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    onchange="updateQueryParamPatternsJson()">
+                                <option value="EXACT" ${matchType === 'EXACT' ? 'selected' : ''}>Exact</option>
+                                <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                                <option value="EXISTS" ${matchType === 'EXISTS' ? 'selected' : ''}>Exists</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Pattern</label>
+                            <input type="text" class="query-param-pattern-pattern w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${pattern}" placeholder="\\d+" onchange="updateQueryParamPatternsJson()">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="query-param-pattern-ignore-case rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateQueryParamPatternsJson()">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                
+                patternsList.appendChild(patternDiv);
+                updateQueryParamPatternsJson();
+            }
+
+            function removeQueryParamPattern(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                if (patternDiv) {
+                    patternDiv.remove();
+                    updateQueryParamPatternsJson();
+                }
+            }
+
+            function updateQueryParamPatternsJson() {
+                const patterns = {};
+                const patternDivs = document.querySelectorAll('[id^="queryParamPattern-"]');
+                
+                patternDivs.forEach(div => {
+                    const name = div.querySelector('.query-param-pattern-name').value.trim();
+                    const matchType = div.querySelector('.query-param-pattern-match-type').value;
+                    const pattern = div.querySelector('.query-param-pattern-pattern').value.trim();
+                    const ignoreCase = div.querySelector('.query-param-pattern-ignore-case').checked;
+                    
+                    if (name) {
+                        patterns[name] = {
+                            matchType: matchType,
+                            pattern: pattern,
+                            ignoreCase: ignoreCase
+                        };
+                    }
+                });
+                
+                document.getElementById('queryParamPatternsJson').value = JSON.stringify(patterns);
+            }
+
+            // Unified Condition Management
+            let conditionCounter = 0;
+            
+            function addCondition() {
+                const conditionType = document.getElementById('conditionType').value;
+                
+                switch(conditionType) {
+                    case 'body':
+                        addUnifiedBodyPattern();
+                        break;
+                    case 'header':
+                        addUnifiedHeaderPattern();
+                        break;
+                    case 'query':
+                        addUnifiedQueryPattern();
+                        break;
+                    case 'path':
+                        addUnifiedPathPattern();
+                        break;
+                }
+                
+                updateNoConditionsMessage();
+            }
+            
+            function addUnifiedBodyPattern(matchType = 'CONTAINS', expr = '', expected = '', ignoreCase = false) {
+                conditionCounter++;
+                const conditionsList = document.getElementById('conditionsList');
+
+                const conditionDiv = document.createElement('div');
+                conditionDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                conditionDiv.id = `condition-${conditionCounter}`;
+                conditionDiv.setAttribute('data-type', 'body');
+
+                conditionDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded">Body Pattern</span>
+                            <span class="text-sm text-gray-600" id="condition-${conditionCounter}-description">
+                                ${generateConditionDescription('body', matchType, expr, expected)}
+                            </span>
+                        </div>
+                        <button type="button" onclick="removeCondition('condition-${conditionCounter}')"
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="condition-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                                    onchange="updateCondition('condition-${conditionCounter}')">
+                                <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                                <option value="JSONPATH" ${matchType === 'JSONPATH' ? 'selected' : ''}>JSONPath</option>
+                                <option value="XPATH" ${matchType === 'XPATH' ? 'selected' : ''}>XPath</option>
+                            </select>
+                        </div>
+                        <div class="condition-expr-field" style="display: ${matchType === 'JSONPATH' || matchType === 'XPATH' ? 'block' : 'none'};">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Expression</label>
+                            <input type="text" class="condition-expr w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                                   value="${expr}" placeholder="$.user.id" onchange="updateCondition('condition-${conditionCounter}')">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Expected Value</label>
+                            <input type="text" class="condition-expected w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                                   value="${expected}" placeholder="Expected value" onchange="updateCondition('condition-${conditionCounter}')">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="condition-ignore-case rounded border-gray-300 text-blue-600"
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateCondition('condition-${conditionCounter}')">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+
+                conditionsList.appendChild(conditionDiv);
+                updateAllPatterns();
+            }
+            
+            function addUnifiedHeaderPattern(matchType = 'EXACT', name = '', pattern = '', ignoreCase = false) {
+                conditionCounter++;
+                const conditionsList = document.getElementById('conditionsList');
+                
+                const conditionDiv = document.createElement('div');
+                conditionDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                conditionDiv.id = `condition-${conditionCounter}`;
+                conditionDiv.setAttribute('data-type', 'header');
+                
+                conditionDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">Header Pattern</span>
+                            <span class="text-sm text-gray-600" id="condition-${conditionCounter}-description">
+                                ${generateConditionDescription('header', matchType, name, pattern)}
+                            </span>
+                        </div>
+                        <button type="button" onclick="removeCondition('condition-${conditionCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Header Name</label>
+                            <input type="text" class="condition-name w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                                   value="${name}" placeholder="Authorization" onchange="updateCondition('condition-${conditionCounter}')">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="condition-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                                    onchange="updateCondition('condition-${conditionCounter}')">
+                                <option value="EXACT" ${matchType === 'EXACT' ? 'selected' : ''}>Exact</option>
+                                <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                                <option value="EXISTS" ${matchType === 'EXISTS' ? 'selected' : ''}>Exists</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Pattern/Value</label>
+                            <input type="text" class="condition-pattern w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                                   value="${pattern}" placeholder="Bearer token" onchange="updateCondition('condition-${conditionCounter}')">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="condition-ignore-case rounded border-gray-300 text-blue-600" 
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateCondition('condition-${conditionCounter}')">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                
+                conditionsList.appendChild(conditionDiv);
+                updateAllPatterns();
+            }
+            
+            function addUnifiedQueryPattern(matchType = 'EXACT', name = '', pattern = '', ignoreCase = false) {
+                conditionCounter++;
+                const conditionsList = document.getElementById('conditionsList');
+                
+                const conditionDiv = document.createElement('div');
+                conditionDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                conditionDiv.id = `condition-${conditionCounter}`;
+                conditionDiv.setAttribute('data-type', 'query');
+                
+                conditionDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded">Query Parameter</span>
+                            <span class="text-sm text-gray-600" id="condition-${conditionCounter}-description">
+                                ${generateConditionDescription('query', matchType, name, pattern)}
+                            </span>
+                        </div>
+                        <button type="button" onclick="removeCondition('condition-${conditionCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Parameter Name</label>
+                            <input type="text" class="condition-name w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                                   value="${name}" placeholder="status" onchange="updateCondition('condition-${conditionCounter}')">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="condition-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                                    onchange="updateCondition('condition-${conditionCounter}')">
+                                <option value="EXACT" ${matchType === 'EXACT' ? 'selected' : ''}>Exact</option>
+                                <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                                <option value="EXISTS" ${matchType === 'EXISTS' ? 'selected' : ''}>Exists</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Pattern/Value</label>
+                            <input type="text" class="condition-pattern w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                                   value="${pattern}" placeholder="active" onchange="updateCondition('condition-${conditionCounter}')">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="condition-ignore-case rounded border-gray-300 text-blue-600" 
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateCondition('condition-${conditionCounter}')">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                
+                conditionsList.appendChild(conditionDiv);
+                updateAllPatterns();
+            }
+            
+            function addUnifiedPathPattern(matchType = 'EXACT', pattern = '', ignoreCase = false) {
+                conditionCounter++;
+                const conditionsList = document.getElementById('conditionsList');
+                
+                const conditionDiv = document.createElement('div');
+                conditionDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                conditionDiv.id = `condition-${conditionCounter}`;
+                conditionDiv.setAttribute('data-type', 'path');
+                
+                conditionDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-semibold rounded">Path Pattern</span>
+                            <span class="text-sm text-gray-600" id="condition-${conditionCounter}-description">
+                                ${generateConditionDescription('path', matchType, '', pattern)}
+                            </span>
+                        </div>
+                        <button type="button" onclick="removeCondition('condition-${conditionCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="condition-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                                    onchange="updateCondition('condition-${conditionCounter}')">
+                                <option value="EXACT" ${matchType === 'EXACT' ? 'selected' : ''}>Exact</option>
+                                <option value="WILDCARD" ${matchType === 'WILDCARD' ? 'selected' : ''}>Wildcard</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Pattern</label>
+                            <input type="text" class="condition-pattern w-full border border-gray-300 rounded px-2 py-1 text-sm" 
+                                   value="${pattern}" placeholder="/api/users/*" onchange="updateCondition('condition-${conditionCounter}')">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="condition-ignore-case rounded border-gray-300 text-blue-600" 
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateCondition('condition-${conditionCounter}')">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                
+                conditionsList.appendChild(conditionDiv);
+                updateAllPatterns();
+            }
+            
+            function removeCondition(conditionId) {
+                const conditionDiv = document.getElementById(conditionId);
+                if (conditionDiv) {
+                    conditionDiv.remove();
+                    updateAllPatterns();
+                    updateNoConditionsMessage();
+                }
+            }
+            
+            function updateCondition(conditionId) {
+                const conditionDiv = document.getElementById(conditionId);
+                const type = conditionDiv.getAttribute('data-type');
+                
+                // Update description
+                const descriptionSpan = document.getElementById(conditionId + '-description');
+                if (type === 'body') {
+                    const matchType = conditionDiv.querySelector('.condition-match-type').value;
+                    const expr = conditionDiv.querySelector('.condition-expr').value;
+                    const expected = conditionDiv.querySelector('.condition-expected').value;
+                    descriptionSpan.textContent = generateConditionDescription('body', matchType, expr, expected);
+                    
+                    // Toggle expression field visibility
+                    const exprField = conditionDiv.querySelector('.condition-expr-field');
+                    exprField.style.display = (matchType === 'JSONPATH' || matchType === 'XPATH') ? 'block' : 'none';
+                } else if (type === 'header' || type === 'query') {
+                    const matchType = conditionDiv.querySelector('.condition-match-type').value;
+                    const name = conditionDiv.querySelector('.condition-name').value;
+                    const pattern = conditionDiv.querySelector('.condition-pattern').value;
+                    descriptionSpan.textContent = generateConditionDescription(type, matchType, name, pattern);
+                } else if (type === 'path') {
+                    const matchType = conditionDiv.querySelector('.condition-match-type').value;
+                    const pattern = conditionDiv.querySelector('.condition-pattern').value;
+                    descriptionSpan.textContent = generateConditionDescription('path', matchType, '', pattern);
+                }
+                
+                updateAllPatterns();
+            }
+            
+            function generateConditionDescription(type, matchType, expr, expected) {
+                if (type === 'body') {
+                    if (!expected || expected.trim() === '') {
+                        return 'Pattern not configured';
+                    }
+                    switch(matchType) {
+                        case 'CONTAINS':
+                            return `Body must contain: "${expected}"`;
+                        case 'REGEX':
+                            return `Body must match regex: "${expected}"`;
+                        case 'JSONPATH':
+                            return `JSON field "${expr}" must equal: "${expected}"`;
+                        case 'XPATH':
+                            return `XML element "${expr}" must equal: "${expected}"`;
+                        default:
+                            return 'Pattern not configured';
+                    }
+                } else if (type === 'header') {
+                    if (!expr || expr.trim() === '') {
+                        return 'Header name not specified';
+                    }
+                    switch(matchType) {
+                        case 'EXACT':
+                            return `Header "${expr}" must equal: "${expected}"`;
+                        case 'CONTAINS':
+                            return `Header "${expr}" must contain: "${expected}"`;
+                        case 'REGEX':
+                            return `Header "${expr}" must match regex: "${expected}"`;
+                        case 'EXISTS':
+                            return `Header "${expr}" must be present`;
+                        default:
+                            return 'Pattern not configured';
+                    }
+                } else if (type === 'query') {
+                    if (!expr || expr.trim() === '') {
+                        return 'Parameter name not specified';
+                    }
+                    switch(matchType) {
+                        case 'EXACT':
+                            return `Query param "${expr}" must equal: "${expected}"`;
+                        case 'CONTAINS':
+                            return `Query param "${expr}" must contain: "${expected}"`;
+                        case 'REGEX':
+                            return `Query param "${expr}" must match regex: "${expected}"`;
+                        case 'EXISTS':
+                            return `Query param "${expr}" must be present`;
+                        default:
+                            return 'Pattern not configured';
+                    }
+                } else if (type === 'path') {
+                    if (!expected || expected.trim() === '') {
+                        return 'Path pattern not specified';
+                    }
+                    switch(matchType) {
+                        case 'EXACT':
+                            return `Path must equal: "${expected}"`;
+                        case 'WILDCARD':
+                            return `Path must match wildcard: "${expected}"`;
+                        case 'REGEX':
+                            return `Path must match regex: "${expected}"`;
+                        default:
+                            return 'Pattern not configured';
+                    }
+                }
+                return 'Pattern not configured';
+            }
+            
+            function updateNoConditionsMessage() {
+                const conditionsList = document.getElementById('conditionsList');
+                const noConditionsMessage = document.getElementById('noConditionsMessage');
+                const conditions = conditionsList.querySelectorAll('[id^="condition-"]');
+
+                if (conditions.length === 0) {
+                    if (!noConditionsMessage) {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.id = 'noConditionsMessage';
+                        messageDiv.className = 'text-center text-gray-500 text-sm py-4';
+                        messageDiv.textContent = 'No conditions added yet. Click "Add Condition" to create request matching rules.';
+                        conditionsList.appendChild(messageDiv);
+                    }
+                } else {
+                    if (noConditionsMessage) {
+                        noConditionsMessage.remove();
+                    }
+                }
+            }
+            
+            function updateAllPatterns() {
+                updateBodyPatterns();
+                updateHeaderPatterns();
+                updateQueryPatterns();
+                updatePathPatterns();
+            }
+            
+            function loadExistingConditions() {
+                // Set flag to prevent updateHeaderPatterns from overwriting during load
+                isLoadingExistingPatterns = true;
+
+                // Load existing body patterns into unified interface
+                const bodyPatternsJson = document.getElementById('bodyPatternsJson');
+                if (bodyPatternsJson && bodyPatternsJson.value.trim() && bodyPatternsJson.value.trim() !== '[]') {
+                    try {
+                        const decodedValue = decodeHtmlEntities(bodyPatternsJson.value);
+                        const patterns = JSON.parse(decodedValue);
+                        patterns.forEach((pattern, index) => {
+                            addUnifiedBodyPattern(
+                                pattern.matchType || 'EXACT',
+                                pattern.expr || '',
+                                pattern.expected || '',
+                                pattern.ignoreCase || false
+                            );
+                        });
+                    } catch (e) {
+                        console.error('Failed to parse existing body patterns:', e);
+                    }
+                }
+
+                // Load existing header patterns into unified interface
+                const headerPatternsJson = document.getElementById('headerPatternsJson');
+                if (headerPatternsJson && headerPatternsJson.value.trim() && headerPatternsJson.value !== '{}') {
+                    try {
+                        const decodedValue = decodeHtmlEntities(headerPatternsJson.value);
+                        const patterns = JSON.parse(decodedValue);
+                        Object.entries(patterns).forEach(([name, pattern]) => {
+                            addUnifiedHeaderPattern(
+                                pattern.matchType || 'EXACT',
+                                name,
+                                pattern.pattern || '',
+                                pattern.ignoreCase || false
+                            );
+                        });
+                    } catch (e) {
+                        console.error('Failed to parse existing header patterns:', e);
+                    }
+                }
+
+                // Reset flag after loading is complete
+                isLoadingExistingPatterns = false;
+                
+                // Load existing query parameter patterns into unified interface
+                const queryParamPatternsJson = document.getElementById('queryParamPatternsJson');
+                if (queryParamPatternsJson && queryParamPatternsJson.value.trim() && queryParamPatternsJson.value !== '{}') {
+                    try {
+                        const decodedValue = decodeHtmlEntities(queryParamPatternsJson.value);
+                        const patterns = JSON.parse(decodedValue);
+                        Object.entries(patterns).forEach(([name, pattern]) => {
+                            addUnifiedQueryPattern(
+                                pattern.matchType || 'EXACT',
+                                name,
+                                pattern.pattern || '',
+                                pattern.ignoreCase || false
+                            );
+                        });
+                    } catch (e) {
+                        console.warn('Failed to parse existing query parameter patterns:', e);
+                    }
+                }
+                
+                // Load existing path pattern into unified interface
+                const pathPatternJson = document.getElementById('pathPatternJson');
+                if (pathPatternJson && pathPatternJson.value.trim() && pathPatternJson.value !== '{}') {
+                    try {
+                        const decodedValue = decodeHtmlEntities(pathPatternJson.value);
+                        const pathPattern = JSON.parse(decodedValue);
+                        if (pathPattern.pattern && pathPattern.pattern.trim()) {
+                            addUnifiedPathPattern(
+                                pathPattern.matchType || 'EXACT',
+                                pathPattern.pattern,
+                                pathPattern.ignoreCase || false
+                            );
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse existing path pattern:', e);
+                    }
+                }
+                
+                updateNoConditionsMessage();
+                
+                // Final debug - show what's actually in conditionsList
+                setTimeout(function() {
+                    const finalConditionsList = document.getElementById('conditionsList');
+                }, 200);
+            }
+            
+            function updateBodyPatterns() {
+                const bodyPatterns = [];
+                const bodyConditions = document.querySelectorAll('[data-type="body"]');
+                
+                bodyConditions.forEach(conditionDiv => {
+                    const matchType = conditionDiv.querySelector('.condition-match-type').value;
+                    const expr = conditionDiv.querySelector('.condition-expr')?.value || '';
+                    const expected = conditionDiv.querySelector('.condition-expected').value || '';
+                    const ignoreCase = conditionDiv.querySelector('.condition-ignore-case').checked;
+                    
+                    if (expected.trim()) {
+                        bodyPatterns.push({
+                            matchType: matchType,
+                            expr: expr,
+                            expected: expected,
+                            ignoreCase: ignoreCase
+                        });
+                    }
+                });
+                
+                document.getElementById('bodyPatternsJson').value = JSON.stringify(bodyPatterns);
+            }
+            
+            let isLoadingExistingPatterns = false;
+
+            function updateHeaderPatterns() {
+                // Don't overwrite during initial load of existing patterns
+                if (isLoadingExistingPatterns) {
+                    return;
+                }
+
+                const headerPatterns = {};
+                const headerConditions = document.querySelectorAll('[data-type="header"]');
+
+                headerConditions.forEach(conditionDiv => {
+                    const name = conditionDiv.querySelector('.condition-name').value.trim();
+                    const matchType = conditionDiv.querySelector('.condition-match-type').value;
+                    const pattern = conditionDiv.querySelector('.condition-pattern').value;
+                    const ignoreCase = conditionDiv.querySelector('.condition-ignore-case').checked;
+
+                    if (name) {
+                        headerPatterns[name] = {
+                            matchType: matchType,
+                            pattern: pattern,
+                            ignoreCase: ignoreCase
+                        };
+                    }
+                });
+
+                document.getElementById('headerPatternsJson').value = JSON.stringify(headerPatterns);
+
+                // Update mode to advanced if we have patterns
+                const hasPatterns = Object.keys(headerPatterns).length > 0;
+                document.getElementById('headerMatchingMode').value = hasPatterns ? 'advanced' : 'simple';
+            }
+            
+            function updateQueryPatterns() {
+                const queryPatterns = {};
+                const queryConditions = document.querySelectorAll('[data-type="query"]');
+                
+                queryConditions.forEach(conditionDiv => {
+                    const name = conditionDiv.querySelector('.condition-name').value.trim();
+                    const matchType = conditionDiv.querySelector('.condition-match-type').value;
+                    const pattern = conditionDiv.querySelector('.condition-pattern').value;
+                    const ignoreCase = conditionDiv.querySelector('.condition-ignore-case').checked;
+                    
+                    if (name) {
+                        queryPatterns[name] = {
+                            matchType: matchType,
+                            pattern: pattern,
+                            ignoreCase: ignoreCase
+                        };
+                    }
+                });
+                
+                document.getElementById('queryParamPatternsJson').value = JSON.stringify(queryPatterns);
+                
+                // Update mode to advanced if we have patterns
+                const hasPatterns = Object.keys(queryPatterns).length > 0;
+                document.getElementById('queryParamMatchingMode').value = hasPatterns ? 'advanced' : 'simple';
+            }
+            
+            function updatePathPatterns() {
+                const pathConditions = document.querySelectorAll('[data-type="path"]');
+                
+                if (pathConditions.length > 0) {
+                    const conditionDiv = pathConditions[0]; // Only use first path pattern
+                    const matchType = conditionDiv.querySelector('.condition-match-type').value;
+                    const pattern = conditionDiv.querySelector('.condition-pattern').value;
+                    const ignoreCase = conditionDiv.querySelector('.condition-ignore-case').checked;
+                    
+                    document.getElementById('pathMatchingMode').value = 'advanced';
+                    document.getElementById('pathMatchType').value = matchType;
+                    document.getElementById('pathPattern').value = pattern;
+                    document.getElementById('pathIgnoreCase').value = ignoreCase;
+                } else {
+                    document.getElementById('pathMatchingMode').value = 'simple';
+                    document.getElementById('pathMatchType').value = 'EXACT';
+                    document.getElementById('pathPattern').value = '';
+                    document.getElementById('pathIgnoreCase').value = 'false';
+                }
+            }
+
+            function addBodyPattern(matchType = 'CONTAINS', expr = '', expected = '', ignoreCase = false) {
+                bodyPatternCounter++;
+                const patternsList = document.getElementById('bodyPatternsList');
+                
+                const patternDiv = document.createElement('div');
+                patternDiv.className = 'border border-gray-200 rounded-lg p-3 bg-white';
+                patternDiv.id = `bodyPattern-${bodyPatternCounter}`;
+                
+                // Generate description based on pattern
+                const description = generatePatternDescription(matchType, expr, expected);
+                
+                const htmlContent = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div>
+                            <h5 class="text-sm font-medium text-gray-900">Body Pattern #${bodyPatternCounter}</h5>
+                            <p class="text-xs text-blue-600 mt-1 pattern-description">${description}</p>
+                        </div>
+                        <button type="button" onclick="removeBodyPattern('bodyPattern-${bodyPatternCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                            <select class="body-pattern-match-type w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    onchange="updateBodyPatternsJson(); toggleBodyPatternFields('bodyPattern-${bodyPatternCounter}'); updatePatternDescription('bodyPattern-${bodyPatternCounter}')">
+                                <option value="CONTAINS" ${matchType === 'CONTAINS' ? 'selected' : ''}>Contains</option>
+                                <option value="REGEX" ${matchType === 'REGEX' ? 'selected' : ''}>Regex</option>
+                                <option value="JSONPATH" ${matchType === 'JSONPATH' ? 'selected' : ''}>JSONPath</option>
+                                <option value="XPATH" ${matchType === 'XPATH' ? 'selected' : ''}>XPath</option>
+                            </select>
+                        </div>
+                        <div class="body-pattern-expr-field" style="display: ${matchType === 'JSONPATH' || matchType === 'XPATH' ? 'block' : 'none'};">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Expression</label>
+                            <input type="text" class="body-pattern-expr w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${expr}" placeholder="$.user.id" onchange="updateBodyPatternsJson(); updatePatternDescription('bodyPattern-${bodyPatternCounter}')">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Expected Value</label>
+                            <input type="text" class="body-pattern-expected w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${expected}" placeholder="123" onchange="updateBodyPatternsJson(); updatePatternDescription('bodyPattern-${bodyPatternCounter}')">
+                        </div>
+                        <div class="flex items-center">
+                            <label class="flex items-center space-x-1">
+                                <input type="checkbox" class="body-pattern-ignore-case rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                                       ${ignoreCase ? 'checked' : ''} onchange="updateBodyPatternsJson()">
+                                <span class="text-xs text-gray-700">Ignore Case</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                
+                patternDiv.innerHTML = htmlContent;
+                
+                if (patternsList) {
+                    patternsList.appendChild(patternDiv);
+                }
+                
+                updateBodyPatternsJson();
+            }
+
+            function removeBodyPattern(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                if (patternDiv) {
+                    patternDiv.remove();
+                    updateBodyPatternsJson();
+                }
+            }
+
+            function toggleBodyPatternFields(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                const matchType = patternDiv.querySelector('.body-pattern-match-type').value;
+                const exprField = patternDiv.querySelector('.body-pattern-expr-field');
+                
+                if (matchType === 'JSONPATH' || matchType === 'XPATH') {
+                    exprField.style.display = 'block';
+                } else {
+                    exprField.style.display = 'none';
+                }
+            }
+
+            function updateBodyPatternsJson() {
+                const patterns = [];
+                const patternDivs = document.querySelectorAll('[id^="bodyPattern-"]');
+                
+                patternDivs.forEach(div => {
+                    const matchType = div.querySelector('.body-pattern-match-type').value;
+                    const expr = div.querySelector('.body-pattern-expr').value.trim();
+                    const expected = div.querySelector('.body-pattern-expected').value.trim();
+                    const ignoreCase = div.querySelector('.body-pattern-ignore-case').checked;
+                    
+                    patterns.push({
+                        matchType: matchType,
+                        expr: expr,
+                        expected: expected,
+                        ignoreCase: ignoreCase
+                    });
+                });
+                
+                document.getElementById('bodyPatternsJson').value = JSON.stringify(patterns);
+            }
+
+            // Load AI-generated mapping data from URL parameter
+            function loadAIGeneratedData() {
+                try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const aiData = urlParams.get('ai-data');
+
+                    if (!aiData) {
+                        return; // No AI data, normal form load
+                    }
+
+                    console.log('Loading AI-generated data...');
+                    const mapping = JSON.parse(decodeURIComponent(aiData));
+                    console.log('Parsed mapping:', mapping);
+
+                    // Populate basic fields
+                    if (mapping.name) document.getElementById('name').value = mapping.name;
+                    if (mapping.priority) document.getElementById('priority').value = mapping.priority;
+                    if (mapping.enabled !== undefined) document.getElementById('enabled').checked = mapping.enabled;
+
+                    // Populate tags
+                    if (mapping.tags && mapping.tags.length > 0) {
+                        document.getElementById('tags').value = mapping.tags.join(', ');
+                    }
+
+                    // Populate request fields
+                    if (mapping.request) {
+                        if (mapping.request.method) document.getElementById('method').value = mapping.request.method;
+                        if (mapping.request.path) document.getElementById('path').value = mapping.request.path;
+                    }
+
+                    // Populate response fields
+                    if (mapping.response) {
+                        if (mapping.response.status) document.getElementById('status').value = mapping.response.status;
+                        if (mapping.response.body) document.getElementById('body').value = mapping.response.body;
+                        if (mapping.response.templatingEnabled !== undefined) {
+                            document.getElementById('templatingEnabled').checked = mapping.response.templatingEnabled;
+                        }
+
+                        // Populate response headers
+                        if (mapping.response.headers) {
+                            const headerTextarea = document.getElementById('headers');
+                            if (headerTextarea) {
+                                headerTextarea.value = JSON.stringify(mapping.response.headers, null, 2);
+                            }
+                        }
+                    }
+
+                    // Populate delays
+                    if (mapping.delays) {
+                        if (mapping.delays.mode) {
+                            document.getElementById('delayMode').value = mapping.delays.mode;
+                            toggleDelayFields(); // Update visible fields based on mode
+                        }
+                        if (mapping.delays.fixedMs) document.getElementById('fixedDelayMs').value = mapping.delays.fixedMs;
+                        if (mapping.delays.minMs) document.getElementById('minDelayMs').value = mapping.delays.minMs;
+                        if (mapping.delays.maxMs) document.getElementById('maxDelayMs').value = mapping.delays.maxMs;
+                        if (mapping.delays.errorRatePercent !== undefined) {
+                            document.getElementById('errorRatePercent').value = mapping.delays.errorRatePercent;
+                        }
+                    }
+
+                    console.log('AI-generated data loaded successfully');
+                } catch (error) {
+                    console.error('Error loading AI-generated data:', error);
+                }
+            }
+
+            // Initialize on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                // Check for AI-generated data in URL parameter
+                loadAIGeneratedData();
+
+                toggleDelayFields();
+                toggleConditionalResponses();
+                loadExistingConditionalMappings();
+
+                // Initialize advanced pattern form values from hidden inputs
+                initializeAdvancedPatternForms();
+                
+                togglePathMatchingFields();
+                toggleHeaderMatchingFields();
+                toggleQueryParamMatchingFields();
+                
+                // Load old patterns for backward compatibility (but not displayed)
+                // Disabled to prevent conflicts with unified interface
+                // loadExistingHeaderPatterns();
+                // loadExistingQueryParamPatterns();
+                // loadExistingBodyPatterns();
+                
+                // Load existing conditions into unified interface (with delay to ensure DOM is ready)
+                setTimeout(function() {
+                    loadExistingConditions();
+                }, 100);
+            });
+            
+            function initializeAdvancedPatternForms() {
+                // Set path matching form values
+                const pathMatchingMode = document.getElementById('pathMatchingModeHidden')?.value || 'simple';
+                const pathMatchingRadio = document.querySelector(`input[name="pathMatchingMode"][value="${pathMatchingMode}"]`);
+                if (pathMatchingRadio) {
+                    pathMatchingRadio.checked = true;
+                }
+                
+                if (pathMatchingMode === 'advanced') {
+                    const pathMatchType = document.getElementById('pathMatchTypeHidden')?.value || 'EXACT';
+                    const pathPattern = document.getElementById('pathPatternHidden')?.value || '';
+                    const pathIgnoreCase = document.getElementById('pathIgnoreCaseHidden')?.value === 'true';
+                    
+                    const pathMatchTypeSelect = document.getElementById('pathMatchType');
+                    const pathPatternInput = document.getElementById('pathPattern');
+                    const pathIgnoreCaseInput = document.getElementById('pathIgnoreCase');
+                    
+                    if (pathMatchTypeSelect) pathMatchTypeSelect.value = pathMatchType;
+                    if (pathPatternInput) pathPatternInput.value = pathPattern;
+                    if (pathIgnoreCaseInput) pathIgnoreCaseInput.checked = pathIgnoreCase;
+                }
+                
+                // Set header matching form values
+                const headerMatchingMode = document.getElementById('headerMatchingModeHidden')?.value || 'simple';
+                const headerMatchingRadio = document.querySelector(`input[name="headerMatchingMode"][value="${headerMatchingMode}"]`);
+                if (headerMatchingRadio) {
+                    headerMatchingRadio.checked = true;
+                }
+                
+                // Set query param matching form values
+                const queryParamMatchingMode = document.getElementById('queryParamMatchingModeHidden')?.value || 'simple';
+                const queryParamMatchingRadio = document.querySelector(`input[name="queryParamMatchingMode"][value="${queryParamMatchingMode}"]`);
+                if (queryParamMatchingRadio) {
+                    queryParamMatchingRadio.checked = true;
+                }
+            }
+
+            function toggleConditionalResponses() {
+                const enabled = document.getElementById('conditionalResponsesEnabled').checked;
+                const config = document.getElementById('conditionalResponsesConfig');
+                const actions = document.getElementById('conditionalResponsesActions');
+                
+                if (enabled) {
+                    config.style.display = 'block';
+                    actions.style.display = 'block';
+                } else {
+                    config.style.display = 'none';
+                    actions.style.display = 'none';
+                }
+            }
+
+            let conditionalMappingCounter = 0;
+
+            function addConditionalResponseMapping(requestId = '', status = 200, body = '') {
+                conditionalMappingCounter++;
+                const mappingsList = document.getElementById('conditionalMappingsList');
+                
+                const mappingDiv = document.createElement('div');
+                mappingDiv.className = 'border border-gray-200 rounded-lg p-4 bg-gray-50';
+                mappingDiv.id = `conditionalMapping-${conditionalMappingCounter}`;
+                
+                mappingDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-medium text-gray-900">Mapping #${conditionalMappingCounter}</h4>
+                        <button type="button" onclick="removeConditionalResponseMapping('conditionalMapping-${conditionalMappingCounter}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Request ID</label>
+                            <input type="text" class="conditional-request-id w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                   value="${requestId}" placeholder="success-200" onchange="updateConditionalResponsesJson()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">HTTP Status</label>
+                            <select class="conditional-status w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    onchange="updateConditionalResponsesJson()">
+                                <option value="200" ${status == 200 ? 'selected' : ''}>200 - Success</option>
+                                <option value="201" ${status == 201 ? 'selected' : ''}>201 - Created</option>
+                                <option value="400" ${status == 400 ? 'selected' : ''}>400 - Bad Request</option>
+                                <option value="401" ${status == 401 ? 'selected' : ''}>401 - Unauthorized</option>
+                                <option value="403" ${status == 403 ? 'selected' : ''}>403 - Forbidden</option>
+                                <option value="404" ${status == 404 ? 'selected' : ''}>404 - Not Found</option>
+                                <option value="409" ${status == 409 ? 'selected' : ''}>409 - Conflict</option>
+                                <option value="422" ${status == 422 ? 'selected' : ''}>422 - Unprocessable Entity</option>
+                                <option value="500" ${status == 500 ? 'selected' : ''}>500 - Internal Server Error</option>
+                                <option value="502" ${status == 502 ? 'selected' : ''}>502 - Bad Gateway</option>
+                                <option value="503" ${status == 503 ? 'selected' : ''}>503 - Service Unavailable</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Response Body (JSON)</label>
+                            <textarea class="conditional-body w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                      rows="2" placeholder='{"status": "success"}' onchange="updateConditionalResponsesJson()">${body}</textarea>
+                        </div>
+                    </div>
+                `;
+                
+                mappingsList.appendChild(mappingDiv);
+                updateConditionalResponsesJson();
+            }
+
+            function removeConditionalResponseMapping(mappingId) {
+                const mappingDiv = document.getElementById(mappingId);
+                if (mappingDiv) {
+                    mappingDiv.remove();
+                    updateConditionalResponsesJson();
+                }
+            }
+
+            function updateConditionalResponsesJson() {
+                const mappings = [];
+                const mappingDivs = document.querySelectorAll('[id^="conditionalMapping-"]');
+                
+                mappingDivs.forEach(div => {
+                    const requestId = div.querySelector('.conditional-request-id').value.trim();
+                    const status = parseInt(div.querySelector('.conditional-status').value);
+                    const body = div.querySelector('.conditional-body').value.trim();
+                    
+                    if (requestId) {
+                        mappings.push({
+                            requestId: requestId,
+                            status: status,
+                            body: body || `{"status": "${status >= 400 ? 'error' : 'success'}", "requestId": "${requestId}"}`
+                        });
+                    }
+                });
+                
+                document.getElementById('conditionalResponsesJson').value = JSON.stringify(mappings);
+            }
+
+            function useDefaultConditionalResponses() {
+                // Clear existing mappings
+                document.getElementById('conditionalMappingsList').innerHTML = '';
+                conditionalMappingCounter = 0;
+                
+                // Add default mappings
+                addConditionalResponseMapping('success-200', 200, '{"status": "success", "message": "Request processed successfully"}');
+                addConditionalResponseMapping('error-400', 400, '{"status": "error", "message": "Bad request - invalid parameters", "errorCode": "INVALID_PARAMETERS"}');
+                addConditionalResponseMapping('error-500', 500, '{"status": "error", "message": "Internal server error - service unavailable", "errorCode": "SERVICE_UNAVAILABLE"}');
+            }
+
+            function clearConditionalResponses() {
+                document.getElementById('conditionalMappingsList').innerHTML = '';
+                conditionalMappingCounter = 0;
+                updateConditionalResponsesJson();
+            }
+
+            // Load existing mappings when page loads
+            function loadExistingConditionalMappings() {
+                const jsonTextarea = document.getElementById('conditionalResponsesJson');
+                if (jsonTextarea && jsonTextarea.value.trim()) {
+                    try {
+                        const mappings = JSON.parse(jsonTextarea.value);
+                        mappings.forEach(mapping => {
+                            addConditionalResponseMapping(
+                                mapping.requestId || '',
+                                mapping.status || 200,
+                                mapping.body || ''
+                            );
+                        });
+                    } catch (e) {
+                        console.warn('Failed to parse existing conditional responses:', e);
+                    }
+                }
+            }
+            
+            // Load existing header patterns when page loads
+            function loadExistingHeaderPatterns() {
+                const jsonTextarea = document.getElementById('headerPatternsJson');
+                if (jsonTextarea && jsonTextarea.value.trim() && jsonTextarea.value !== '{}') {
+                    try {
+                        const patterns = JSON.parse(jsonTextarea.value);
+                        Object.keys(patterns).forEach(name => {
+                            const pattern = patterns[name];
+                            addHeaderPattern(
+                                name,
+                                pattern.matchType || 'EXACT',
+                                pattern.pattern || '',
+                                pattern.ignoreCase || false
+                            );
+                        });
+                    } catch (e) {
+                        console.warn('Failed to parse existing header patterns:', e);
+                    }
+                }
+            }
+            
+            // Load existing query param patterns when page loads
+            function loadExistingQueryParamPatterns() {
+                const jsonTextarea = document.getElementById('queryParamPatternsJson');
+                if (jsonTextarea && jsonTextarea.value.trim() && jsonTextarea.value !== '{}') {
+                    try {
+                        const patterns = JSON.parse(jsonTextarea.value);
+                        Object.keys(patterns).forEach(name => {
+                            const pattern = patterns[name];
+                            addQueryParamPattern(
+                                name,
+                                pattern.matchType || 'EXACT',
+                                pattern.pattern || '',
+                                pattern.ignoreCase || false
+                            );
+                        });
+                    } catch (e) {
+                        console.warn('Failed to parse existing query param patterns:', e);
+                    }
+                }
+            }
+            
+            // Helper function to decode HTML entities
+            function decodeHtmlEntities(text) {
+                try {
+                    // Direct approach - remove the excessive escaping step by step
+                    let decoded = text;
+                    
+                    // Remove HTML entity encoding
+                    decoded = decoded.replace(/&quot;/g, '"');
+                    decoded = decoded.replace(/&lt;/g, '<');
+                    decoded = decoded.replace(/&gt;/g, '>');
+                    decoded = decoded.replace(/&amp;/g, '&');
+                    
+                    return decoded;
+                } catch (e) {
+                    console.error('Error in decodeHtmlEntities:', e);
+                    return text;
+                }
+            }
+            
+            // Generate human-readable description for body patterns
+            function generatePatternDescription(matchType, expr, expected) {
+                if (!expected || expected.trim() === '') {
+                    return 'Pattern not configured';
+                }
+                
+                switch(matchType) {
+                    case 'CONTAINS':
+                        return 'Request body must contain: "' + expected + '"';
+                    case 'JSONPATH':
+                        return 'JSON field "' + expr + '" must equal: "' + expected + '"';
+                    case 'XPATH':
+                        return 'XML element "' + expr + '" must equal: "' + expected + '"';
+                    case 'REGEX':
+                        // Try to provide more specific descriptions for common patterns
+                        if (expected.indexOf('account_number') !== -1) {
+                            if (expected.indexOf('(?!.*') !== -1) {
+                                return 'Request must NOT contain account_number field';
+                            } else if (expected.indexOf('(?!\\d{7,10}$)') !== -1) {
+                                return 'account_number must NOT be 7-10 digits (invalid format)';
+                            } else if (expected.indexOf('\\d{7,10}') !== -1) {
+                                return 'account_number must be 7-10 digits';
+                            } else {
+                                return 'account_number field validation';
+                            }
+                        } else if (expected.indexOf('routing_number') !== -1) {
+                            if (expected.indexOf('(?!.*') !== -1) {
+                                return 'Request must NOT contain routing_number field';
+                            } else if (expected.indexOf('(?!\\d{9}$)') !== -1) {
+                                return 'routing_number must NOT be exactly 9 digits (invalid format)';
+                            } else if (expected.indexOf('\\d{9}') !== -1) {
+                                return 'routing_number must be exactly 9 digits';
+                            } else if (expected.indexOf('021000021|111000025|999999999') !== -1) {
+                                return 'routing_number must be one of blocked numbers';
+                            } else {
+                                return 'routing_number field validation';
+                            }
+                        } else {
+                            return 'Request body must match regex: ' + expected.substring(0, 50) + (expected.length > 50 ? '...' : '');
+                        }
+                    default:
+                        return 'Pattern: ' + expected;
+                }
+            }
+            
+            // Update pattern description when values change
+            function updatePatternDescription(patternId) {
+                const patternDiv = document.getElementById(patternId);
+                if (!patternDiv) return;
+                
+                const matchType = patternDiv.querySelector('.body-pattern-match-type').value;
+                const expr = patternDiv.querySelector('.body-pattern-expr')?.value || '';
+                const expected = patternDiv.querySelector('.body-pattern-expected').value;
+                
+                const description = generatePatternDescription(matchType, expr, expected);
+                const descriptionElement = patternDiv.querySelector('.pattern-description');
+                if (descriptionElement) {
+                    descriptionElement.textContent = description;
+                }
+            }
+            
+            // Load existing body patterns when page loads
+            function loadExistingBodyPatterns() {
+                const jsonTextarea = document.getElementById('bodyPatternsJson');
+                
+                if (jsonTextarea && jsonTextarea.value.trim() && jsonTextarea.value !== '[]') {
+                    try {
+                        // Decode HTML entities before parsing JSON
+                        const decodedValue = decodeHtmlEntities(jsonTextarea.value);
+                        const patterns = JSON.parse(decodedValue);
+                        
+                        patterns.forEach((pattern) => {
+                            addBodyPattern(
+                                pattern.matchType || 'EXACT',
+                                pattern.expr || '',
+                                pattern.expected || '',
+                                pattern.ignoreCase || false
+                            );
+                        });
+                    } catch (e) {
+                        console.warn('Failed to parse existing body patterns:', e);
+                    }
+                }
+            }
+        </script>
+    </div>
+</body>
+</html>
