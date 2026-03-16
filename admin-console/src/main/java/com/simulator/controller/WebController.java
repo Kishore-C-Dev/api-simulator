@@ -137,6 +137,16 @@ public class WebController {
         return "mapping-form";
     }
 
+    @GetMapping("/mappings/new/soap")
+    public String newSOAPMapping(HttpSession session, Model model) {
+        if (!sessionManager.isAuthenticated(session)) {
+            return "redirect:/login";
+        }
+        model.addAttribute("mapping", new RequestMapping());
+        model.addAttribute("isEdit", false);
+        return "soap-mapping-form";
+    }
+
     @GetMapping("/mappings/new/graphql")
     public String newGraphQLMapping(HttpSession session, Model model) {
         // Check authentication
@@ -287,6 +297,17 @@ public class WebController {
                         }
 
                         return "graphql-mapping-form";
+                    }
+
+                    // Check if this is a SOAP mapping
+                    if (mapping.getEndpointType() != null && mapping.getEndpointType().name().equals("SOAP")) {
+                        model.addAttribute("isSOAP", true);
+                        if (mapping.getRequest() != null && mapping.getRequest().getPath() != null) {
+                            model.addAttribute("requestPath", mapping.getRequest().getPath());
+                        } else {
+                            model.addAttribute("requestPath", "/soap");
+                        }
+                        return "soap-mapping-form";
                     }
 
                     return "mapping-form";

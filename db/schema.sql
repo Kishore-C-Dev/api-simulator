@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS mappings (
     request        JSONB,
     response       JSONB,
     delays         JSONB,
-    graphql_spec   JSONB
+    graphql_spec   JSONB,
+    soap_spec      JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_mappings_namespace   ON mappings(namespace);
 CREATE INDEX IF NOT EXISTS idx_mappings_ns_en_pri   ON mappings(namespace, enabled, priority DESC);

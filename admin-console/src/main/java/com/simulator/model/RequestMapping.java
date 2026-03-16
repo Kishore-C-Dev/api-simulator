@@ -39,6 +39,10 @@ public class RequestMapping {
     private GraphQLSpec graphQLSpec;
 
     @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "soap_spec", columnDefinition = "jsonb")
+    private SoapSpec soapSpec;
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "response", columnDefinition = "jsonb")
     private ResponseSpec response;
 
@@ -180,6 +184,7 @@ public class RequestMapping {
         private Boolean templatingEnabled;
         private ConditionalResponses conditionalResponses;
         private GraphQLResponseSpec graphQLResponse;
+        private SoapResponseSpec soapResponse;
 
         public Integer getStatus() { return status; }
         public void setStatus(Integer status) { this.status = status; }
@@ -198,6 +203,45 @@ public class RequestMapping {
 
         public GraphQLResponseSpec getGraphQLResponse() { return graphQLResponse; }
         public void setGraphQLResponse(GraphQLResponseSpec graphQLResponse) { this.graphQLResponse = graphQLResponse; }
+
+        public SoapResponseSpec getSoapResponse() { return soapResponse; }
+        public void setSoapResponse(SoapResponseSpec soapResponse) { this.soapResponse = soapResponse; }
+    }
+
+    public static class SoapResponseSpec {
+        private String responseXml;
+        private String faultCode;
+        private String faultString;
+
+        public String getResponseXml() { return responseXml; }
+        public void setResponseXml(String responseXml) { this.responseXml = responseXml; }
+
+        public String getFaultCode() { return faultCode; }
+        public void setFaultCode(String faultCode) { this.faultCode = faultCode; }
+
+        public String getFaultString() { return faultString; }
+        public void setFaultString(String faultString) { this.faultString = faultString; }
+    }
+
+    public static class SoapSpec {
+        public enum SoapVersion { SOAP_1_1, SOAP_1_2 }
+
+        private SoapVersion soapVersion;
+        private String serviceNamespace;
+        private String operationName;
+        private String xpathPattern;
+
+        public SoapVersion getSoapVersion() { return soapVersion; }
+        public void setSoapVersion(SoapVersion soapVersion) { this.soapVersion = soapVersion; }
+
+        public String getServiceNamespace() { return serviceNamespace; }
+        public void setServiceNamespace(String serviceNamespace) { this.serviceNamespace = serviceNamespace; }
+
+        public String getOperationName() { return operationName; }
+        public void setOperationName(String operationName) { this.operationName = operationName; }
+
+        public String getXpathPattern() { return xpathPattern; }
+        public void setXpathPattern(String xpathPattern) { this.xpathPattern = xpathPattern; }
     }
 
     public static class GraphQLResponseSpec {
@@ -326,6 +370,9 @@ public class RequestMapping {
 
     public GraphQLSpec getGraphQLSpec() { return graphQLSpec; }
     public void setGraphQLSpec(GraphQLSpec graphQLSpec) { this.graphQLSpec = graphQLSpec; }
+
+    public SoapSpec getSoapSpec() { return soapSpec; }
+    public void setSoapSpec(SoapSpec soapSpec) { this.soapSpec = soapSpec; }
 
     public ResponseSpec getResponse() { return response; }
     public void setResponse(ResponseSpec response) { this.response = response; }

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{layout}">
+<head>
+    <title th:text="(${isEdit} ? 'Edit' : 'New') + ' SOAP Mapping - API Simulator'">New SOAP Mapping - API Simulator</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-900" th:text="${isEdit} ? 'Edit SOAP Mapping' : 'Create New SOAP Mapping'">
+                    Create New SOAP Mapping
+                </h1>
+                <a th:href="@{/}" class="text-blue-600 hover:text-blue-800">← Back to Dashboard</a>
+            </div>
+
+            <form method="POST"
+                  th:action="${isEdit} ? @{'/admin/mappings/' + ${mapping.id} + '/form'} : @{/admin/mappings/form}"
+                  class="space-y-6">
+
+                <div id="form-result"></div>
+
+                <!-- Hidden field for endpoint type -->
+                <input type="hidden" name="endpointType" value="SOAP">
+
+                <!-- Basic Information -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Mapping Name</label>
+                        <input type="text" id="name" name="name" required
+                               th:value="${mapping.name}"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    </div>
+                    <div>
+                        <label for="priority" class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                        <input type="number" id="priority" name="priority" min="1" max="10"
+                               th:value="${mapping.priority} ?: 5"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="requestPath" class="block text-sm font-medium text-gray-700 mb-2">SOAP Endpoint Path</label>
+                        <input type="text" id="requestPath" name="requestPath" required
+                               th:value="${requestPath} ?: '/soap'"
+                               placeholder="/soap"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        <p class="text-xs text-gray-500 mt-1">The URL path for this SOAP endpoint (e.g., /soap, /services/user, /ws)</p>
+                    </div>
+                    <div>
+                        <label for="enabled" class="flex items-center space-x-2 mt-8">
+                            <input type="checkbox" id="enabled" name="enabled"
+                                   th:checked="${mapping.enabled} ?: true"
+                                   class="rounded border-gray-300 text-orange-600 focus:ring-orange-500">
+                            <span class="text-sm font-medium text-gray-700">Enabled</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="tags" class="block text-sm font-medium text-gray-700 mb-2">Tags (comma-separated)</label>
+                    <input type="text" id="tags" name="tags"
+                           th:value="${mapping.tags} ? ${#strings.listJoin(mapping.tags, ', ')} : ''"
+                           placeholder="soap, service, legacy"
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                </div>
+
+                <!-- SOAP Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">SOAP Configuration</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="soapVersion" class="block text-sm font-medium text-gray-700 mb-2">SOAP Version</label>
+                            <select id="soapVersion" name="soapVersion"
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="SOAP_1_2"
+                                        th:selected="${mapping.soapSpec?.soapVersion?.name() == 'SOAP_1_2' or mapping.soapSpec?.soapVersion == null}">
+                                    SOAP 1.2
+                                </option>
+                                <option value="SOAP_1_1"
+                                        th:selected="${mapping.soapSpec?.soapVersion?.name() == 'SOAP_1_1'}">
+                                    SOAP 1.1
+                                </option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">SOAP 1.2 uses application/soap+xml; SOAP 1.1 uses text/xml</p>
+                        </div>
+                        <div>
+                            <label for="soapOperationName" class="block text-sm font-medium text-gray-700 mb-2">Operation Name (optional)</label>
+                            <input type="text" id="soapOperationName" name="soapOperationName"
+                                   th:value="${mapping.soapSpec?.operationName}"
+                                   placeholder="SayHello"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                            <p class="text-xs text-gray-500 mt-1">Used for regex body matching — requests containing this name are matched</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="soapServiceNamespace" class="block text-sm font-medium text-gray-700 mb-2">Service Namespace (optional)</label>
+                            <input type="text" id="soapServiceNamespace" name="soapServiceNamespace"
+                                   th:value="${mapping.soapSpec?.serviceNamespace}"
+                                   placeholder="http://example.com/services"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                            <p class="text-xs text-gray-500 mt-1">Added as xmlns:tns in the SOAP envelope</p>
+                        </div>
+                        <div>
+                            <label for="soapXpathPattern" class="block text-sm font-medium text-gray-700 mb-2">XPath Pattern (optional)</label>
+                            <input type="text" id="soapXpathPattern" name="soapXpathPattern"
+                                   th:value="${mapping.soapSpec?.xpathPattern}"
+                                   placeholder="//SayHello"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                            <p class="text-xs text-gray-500 mt-1">Precise XPath expression for request body matching</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SOAP Response Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">SOAP Response</h3>
+                    <p class="text-sm text-gray-600 mb-4">Configure either a normal response body or a fault response. If fault fields are filled in, a <code class="bg-gray-100 px-1 rounded">&lt;soap:Fault&gt;</code> will be returned.</p>
+
+                    <div class="mb-6">
+                        <label for="soapResponseXml" class="block text-sm font-medium text-gray-700 mb-2">Response XML Body</label>
+                        <textarea id="soapResponseXml" name="soapResponseXml" rows="8"
+                                  th:text="${mapping.response?.soapResponse?.responseXml}"
+                                  placeholder="&lt;SayHelloResponse&gt;
+  &lt;message&gt;Hello World&lt;/message&gt;
+&lt;/SayHelloResponse&gt;"
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono text-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">XML content placed inside <code class="bg-gray-100 px-1 rounded">&lt;soap:Body&gt;</code>. Leave empty if returning a fault.</p>
+                    </div>
+
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-red-800 mb-3">Fault Response (optional)</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="soapFaultCode" class="block text-sm font-medium text-gray-700 mb-2">Fault Code</label>
+                                <input type="text" id="soapFaultCode" name="soapFaultCode"
+                                       th:value="${mapping.response?.soapResponse?.faultCode}"
+                                       placeholder="soap:Server"
+                                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                <p class="text-xs text-gray-500 mt-1">e.g. soap:Server, soap:Client, soap12:Receiver</p>
+                            </div>
+                            <div>
+                                <label for="soapFaultString" class="block text-sm font-medium text-gray-700 mb-2">Fault String / Reason</label>
+                                <input type="text" id="soapFaultString" name="soapFaultString"
+                                       th:value="${mapping.response?.soapResponse?.faultString}"
+                                       placeholder="Internal Server Error"
+                                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                <p class="text-xs text-gray-500 mt-1">Human-readable fault description</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delay Configuration -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Delay Configuration</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label for="delayMode" class="block text-sm font-medium text-gray-700 mb-2">Delay Mode</label>
+                            <select id="delayMode" name="delayMode" onchange="toggleDelayFields()"
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="fixed" th:selected="${mapping.delays?.mode == 'fixed'}">Fixed</option>
+                                <option value="variable" th:selected="${mapping.delays?.mode == 'variable'}">Variable</option>
+                            </select>
+                        </div>
+                        <div id="fixedDelayDiv">
+                            <label for="fixedMs" class="block text-sm font-medium text-gray-700 mb-2">Fixed Delay (ms)</label>
+                            <input type="number" id="fixedMs" name="fixedMs" min="0"
+                                   th:value="${mapping.delays?.fixedMs} ?: 0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                        <div id="variableDelayDiv" style="display: none;">
+                            <label for="variableMinMs" class="block text-sm font-medium text-gray-700 mb-2">Min Delay (ms)</label>
+                            <input type="number" id="variableMinMs" name="variableMinMs" min="0"
+                                   th:value="${mapping.delays?.variableMinMs} ?: 100"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 mb-2">
+                            <label for="variableMaxMs" class="block text-sm font-medium text-gray-700 mb-2">Max Delay (ms)</label>
+                            <input type="number" id="variableMaxMs" name="variableMaxMs" min="0"
+                                   th:value="${mapping.delays?.variableMaxMs} ?: 500"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="errorRatePercent" class="block text-sm font-medium text-gray-700 mb-2">Error Rate (%)</label>
+                            <input type="number" id="errorRatePercent" name="errorRatePercent" min="0" max="100"
+                                   th:value="${mapping.delays?.errorRatePercent} ?: 0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                        <div>
+                            <label for="errorStatus" class="block text-sm font-medium text-gray-700 mb-2">Error Status</label>
+                            <input type="number" id="errorStatus" name="errorStatus" min="400" max="599"
+                                   th:value="${mapping.delays?.errorResponse?.status} ?: 500"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label for="errorBody" class="block text-sm font-medium text-gray-700 mb-2">Error Response Body</label>
+                        <textarea id="errorBody" name="errorBody" rows="3"
+                                  th:text="${mapping.delays?.errorResponse?.body}"
+                                  placeholder="&lt;error&gt;Service temporarily unavailable&lt;/error&gt;"
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono text-sm"></textarea>
+                    </div>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="flex items-center justify-between pt-6 border-t">
+                    <a th:href="@{/}" class="text-gray-600 hover:text-gray-800">Cancel</a>
+                    <div class="space-x-4">
+                        <button type="submit" class="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700 transition-colors">
+                            <span th:text="${isEdit} ? 'Update SOAP Mapping' : 'Create SOAP Mapping'">Create SOAP Mapping</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <script>
+            function toggleDelayFields() {
+                const mode = document.getElementById('delayMode').value;
+                const fixedDiv = document.getElementById('fixedDelayDiv');
+                const variableDiv = document.getElementById('variableDelayDiv');
+
+                if (mode === 'variable') {
+                    fixedDiv.style.display = 'none';
+                    variableDiv.style.display = 'block';
+                } else {
+                    fixedDiv.style.display = 'block';
+                    variableDiv.style.display = 'none';
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                toggleDelayFields();
+            });
+        </script>
+    </div>
+</body>
+</html>

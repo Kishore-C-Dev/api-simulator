@@ -168,8 +168,16 @@ public class AdminController {
             @RequestParam(required = false) String graphqlVariables,
             @RequestParam(required = false) String graphqlData,
             @RequestParam(required = false) String graphqlErrors,
-            @RequestParam(required = false) String graphqlExtensions) {
-        
+            @RequestParam(required = false) String graphqlExtensions,
+            // SOAP-specific parameters
+            @RequestParam(required = false) String soapVersion,
+            @RequestParam(required = false) String soapServiceNamespace,
+            @RequestParam(required = false) String soapOperationName,
+            @RequestParam(required = false) String soapXpathPattern,
+            @RequestParam(required = false) String soapResponseXml,
+            @RequestParam(required = false) String soapFaultCode,
+            @RequestParam(required = false) String soapFaultString) {
+
         try {
             logger.info("Form POST request to /admin/mappings/{} (HTML Form)", id);
             RequestMapping mapping = buildMappingFromForm(name, priority, enabled, tags,
@@ -182,7 +190,9 @@ public class AdminController {
                 headerMatchingMode, headerPatternsJson, queryParamMatchingMode,
                 queryParamPatternsJson, bodyPatternsJson,
                 graphqlOperationType, graphqlOperationName, graphqlSchema,
-                graphqlQuery, graphqlVariables, graphqlData, graphqlErrors, graphqlExtensions);
+                graphqlQuery, graphqlVariables, graphqlData, graphqlErrors, graphqlExtensions,
+                soapVersion, soapServiceNamespace, soapOperationName, soapXpathPattern,
+                soapResponseXml, soapFaultCode, soapFaultString);
             
             mapping.setId(id);
             RequestMapping saved = mappingService.saveMapping(mapping);
@@ -238,7 +248,15 @@ public class AdminController {
             @RequestParam(required = false) String graphqlVariables,
             @RequestParam(required = false) String graphqlData,
             @RequestParam(required = false) String graphqlErrors,
-            @RequestParam(required = false) String graphqlExtensions) {
+            @RequestParam(required = false) String graphqlExtensions,
+            // SOAP-specific parameters
+            @RequestParam(required = false) String soapVersion,
+            @RequestParam(required = false) String soapServiceNamespace,
+            @RequestParam(required = false) String soapOperationName,
+            @RequestParam(required = false) String soapXpathPattern,
+            @RequestParam(required = false) String soapResponseXml,
+            @RequestParam(required = false) String soapFaultCode,
+            @RequestParam(required = false) String soapFaultString) {
 
         try {
             logger.info("Form POST request to /admin/mappings (HTML Form)");
@@ -252,7 +270,9 @@ public class AdminController {
                 headerMatchingMode, headerPatternsJson, queryParamMatchingMode,
                 queryParamPatternsJson, bodyPatternsJson,
                 graphqlOperationType, graphqlOperationName, graphqlSchema,
-                graphqlQuery, graphqlVariables, graphqlData, graphqlErrors, graphqlExtensions);
+                graphqlQuery, graphqlVariables, graphqlData, graphqlErrors, graphqlExtensions,
+                soapVersion, soapServiceNamespace, soapOperationName, soapXpathPattern,
+                soapResponseXml, soapFaultCode, soapFaultString);
             
             RequestMapping saved = mappingService.saveMapping(mapping);
             
@@ -278,7 +298,11 @@ public class AdminController {
             // GraphQL-specific parameters
             String graphqlOperationType, String graphqlOperationName, String graphqlSchema,
             String graphqlQuery, String graphqlVariables, String graphqlData,
-            String graphqlErrors, String graphqlExtensions) throws Exception {
+            String graphqlErrors, String graphqlExtensions,
+            // SOAP-specific parameters
+            String soapVersion, String soapServiceNamespace, String soapOperationName,
+            String soapXpathPattern, String soapResponseXml, String soapFaultCode,
+            String soapFaultString) throws Exception {
         
         RequestMapping mapping = new RequestMapping();
         mapping.setName(name);
@@ -304,6 +328,9 @@ public class AdminController {
         if (EndpointType.GRAPHQL.equals(mapping.getEndpointType())) {
             request.setMethod("POST");
             request.setPath(requestPath != null && !requestPath.trim().isEmpty() ? requestPath : "/graphql");
+        } else if (EndpointType.SOAP.equals(mapping.getEndpointType())) {
+            request.setMethod("POST");
+            request.setPath(requestPath != null && !requestPath.trim().isEmpty() ? requestPath : "/soap");
         } else {
             // For REST endpoints
             request.setMethod(requestMethod);
@@ -359,6 +386,28 @@ public class AdminController {
             }
 
             mapping.setGraphQLSpec(graphqlSpec);
+        }
+
+        // Build SOAP spec if this is a SOAP endpoint
+        if (EndpointType.SOAP.equals(mapping.getEndpointType())) {
+            RequestMapping.SoapSpec soapSpec = new RequestMapping.SoapSpec();
+            if (soapVersion != null && !soapVersion.trim().isEmpty()) {
+                try {
+                    soapSpec.setSoapVersion(RequestMapping.SoapSpec.SoapVersion.valueOf(soapVersion));
+                } catch (Exception e) {
+                    soapSpec.setSoapVersion(RequestMapping.SoapSpec.SoapVersion.SOAP_1_2);
+                }
+            }
+            if (soapServiceNamespace != null && !soapServiceNamespace.trim().isEmpty()) {
+                soapSpec.setServiceNamespace(soapServiceNamespace);
+            }
+            if (soapOperationName != null && !soapOperationName.trim().isEmpty()) {
+                soapSpec.setOperationName(soapOperationName);
+            }
+            if (soapXpathPattern != null && !soapXpathPattern.trim().isEmpty()) {
+                soapSpec.setXpathPattern(soapXpathPattern);
+            }
+            mapping.setSoapSpec(soapSpec);
         }
 
         // Build response
@@ -457,6 +506,27 @@ public class AdminController {
             }
         }
 
+        // Build SOAP response spec if this is a SOAP endpoint
+        if (EndpointType.SOAP.equals(mapping.getEndpointType())) {
+            RequestMapping.SoapResponseSpec soapResp = new RequestMapping.SoapResponseSpec();
+            if (soapResponseXml != null && !soapResponseXml.trim().isEmpty()) {
+                soapResp.setResponseXml(soapResponseXml);
+            }
+            if (soapFaultCode != null && !soapFaultCode.trim().isEmpty()) {
+                soapResp.setFaultCode(soapFaultCode);
+            }
+            if (soapFaultString != null && !soapFaultString.trim().isEmpty()) {
+                soapResp.setFaultString(soapFaultString);
+            }
+            response.setSoapResponse(soapResp);
+            response.setStatus(200);
+            if (response.getHeaders() == null) {
+                response.setHeaders(new HashMap<>());
+            }
+            response.getHeaders().put("Content-Type", "text/xml; charset=UTF-8");
+            response.setBody(buildSoapEnvelope(mapping.getSoapSpec(), soapResp));
+        }
+
         mapping.setResponse(response);
         
         // Build delays
@@ -481,6 +551,54 @@ public class AdminController {
         return mapping;
     }
     
+    private String buildSoapEnvelope(RequestMapping.SoapSpec spec, RequestMapping.SoapResponseSpec resp) {
+        boolean isSoap12 = spec != null
+            && RequestMapping.SoapSpec.SoapVersion.SOAP_1_2.equals(spec.getSoapVersion());
+
+        String ns = isSoap12
+            ? "http://www.w3.org/2003/05/soap-envelope"
+            : "http://schemas.xmlsoap.org/soap/envelope/";
+        String prefix = isSoap12 ? "soap12" : "soap";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        sb.append("<").append(prefix).append(":Envelope xmlns:").append(prefix).append("=\"").append(ns).append("\"");
+        if (spec != null && spec.getServiceNamespace() != null && !spec.getServiceNamespace().trim().isEmpty()) {
+            sb.append(" xmlns:tns=\"").append(spec.getServiceNamespace()).append("\"");
+        }
+        sb.append(">\n");
+        sb.append("  <").append(prefix).append(":Body>\n");
+
+        boolean hasFault = resp != null
+            && (resp.getFaultCode() != null && !resp.getFaultCode().trim().isEmpty()
+                || resp.getFaultString() != null && !resp.getFaultString().trim().isEmpty());
+
+        if (hasFault) {
+            sb.append("    <").append(prefix).append(":Fault>\n");
+            String faultCode = resp.getFaultCode() != null ? resp.getFaultCode() : prefix + ":Server";
+            String faultString = resp.getFaultString() != null ? resp.getFaultString() : "Internal Server Error";
+            if (isSoap12) {
+                sb.append("      <").append(prefix).append(":Code><").append(prefix).append(":Value>")
+                  .append(faultCode).append("</").append(prefix).append(":Value></").append(prefix).append(":Code>\n");
+                sb.append("      <").append(prefix).append(":Reason><").append(prefix).append(":Text>")
+                  .append(faultString).append("</").append(prefix).append(":Text></").append(prefix).append(":Reason>\n");
+            } else {
+                sb.append("      <faultcode>").append(faultCode).append("</faultcode>\n");
+                sb.append("      <faultstring>").append(faultString).append("</faultstring>\n");
+            }
+            sb.append("    </").append(prefix).append(":Fault>\n");
+        } else {
+            String bodyContent = resp != null && resp.getResponseXml() != null ? resp.getResponseXml() : "";
+            if (!bodyContent.trim().isEmpty()) {
+                sb.append("    ").append(bodyContent).append("\n");
+            }
+        }
+
+        sb.append("  </").append(prefix).append(":Body>\n");
+        sb.append("</").append(prefix).append(":Envelope>");
+        return sb.toString();
+    }
+
     private void processAdvancedPatterns(RequestMapping.RequestSpec request, 
                                        String pathMatchingMode, String pathMatchType, String pathPattern, Boolean pathIgnoreCase,
                                        String headerMatchingMode, String headerPatternsJson,

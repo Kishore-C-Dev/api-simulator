@@ -30,6 +30,9 @@
                     <a th:href="@{/mappings/new/graphql}" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-center">
                         New GraphQL Mapping
                     </a>
+                    <a th:href="@{/mappings/new/soap}" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors text-center">
+                        New SOAP Mapping
+                    </a>
                 </div>
             </div>
 
@@ -162,7 +165,8 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 py-1 text-xs font-semibold rounded-full"
                                       th:text="${mapping.endpointType != null ? mapping.endpointType.name() : 'REST'}"
-                                      th:class="${mapping.endpointType != null && mapping.endpointType.name() == 'GRAPHQL'} ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'">
+                                      th:class="${mapping.endpointType != null && mapping.endpointType.name() == 'GRAPHQL'} ? 'bg-purple-100 text-purple-800' :
+                                               (${mapping.endpointType != null && mapping.endpointType.name() == 'SOAP'} ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800')">
                                     REST
                                 </span>
                             </td>
@@ -177,8 +181,10 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <span th:if="${mapping.endpointType != null && mapping.endpointType.name() == 'GRAPHQL'}"
-                                      class="text-purple-600 font-medium">GraphQL Endpoint</span>
-                                <span th:if="${mapping.endpointType == null || mapping.endpointType.name() != 'GRAPHQL'}"
+                                      class="text-purple-600 font-medium" th:text="${mapping.request?.path ?: 'GraphQL Endpoint'}">GraphQL Endpoint</span>
+                                <span th:if="${mapping.endpointType != null && mapping.endpointType.name() == 'SOAP'}"
+                                      class="text-orange-600 font-medium" th:text="${mapping.request?.path ?: 'SOAP Endpoint'}">SOAP Endpoint</span>
+                                <span th:if="${mapping.endpointType == null || (mapping.endpointType.name() != 'GRAPHQL' && mapping.endpointType.name() != 'SOAP')}"
                                       th:text="${mapping.request?.path ?: '/api/path'}">/api/path</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">

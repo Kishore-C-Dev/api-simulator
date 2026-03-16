@@ -67,6 +67,12 @@ public class WireMockMappingService {
             return;
         }
 
+        // Handle SOAP endpoints
+        if (EndpointType.SOAP.equals(mapping.getEndpointType())) {
+            createSOAPStubMapping(mapping);
+            return;
+        }
+
         // Handle regular REST endpoints
         MappingBuilder requestBuilder = buildRequestPattern(mapping.getRequest());
         ResponseDefinitionBuilder responseBuilder = buildResponse(mapping);
@@ -131,6 +137,62 @@ public class WireMockMappingService {
         }
 
         logger.debug("Created GraphQL stub mapping: {} -> GraphQL Response", mapping.getName());
+    }
+
+    private void createSOAPStubMapping(RequestMapping mapping) {
+        logger.debug("Creating SOAP stub mapping for: {}", mapping.getName());
+
+        String soapPath = "/soap";
+        if (mapping.getRequest() != null && mapping.getRequest().getPath() != null
+                && !mapping.getRequest().getPath().trim().isEmpty()) {
+            soapPath = mapping.getRequest().getPath();
+        }
+
+        MappingBuilder requestBuilder = WireMock.post(WireMock.urlEqualTo(soapPath))
+            .withHeader("Content-Type", WireMock.matching("text/xml.*|application/soap\\+xml.*"));
+
+        RequestMapping.SoapSpec soapSpec = mapping.getSoapSpec();
+        if (soapSpec != null) {
+            if (soapSpec.getOperationName() != null && !soapSpec.getOperationName().trim().isEmpty()) {
+                requestBuilder = requestBuilder.withRequestBody(
+                    WireMock.matching(".*" + soapSpec.getOperationName() + ".*"));
+            }
+            if (soapSpec.getXpathPattern() != null && !soapSpec.getXpathPattern().trim().isEmpty()) {
+                requestBuilder = requestBuilder.withRequestBody(
+                    WireMock.matchingXPath(soapSpec.getXpathPattern()));
+            }
+        }
+
+        String responseBody = "";
+        if (mapping.getResponse() != null && mapping.getResponse().getBody() != null) {
+            responseBody = mapping.getResponse().getBody();
+        }
+
+        ResponseDefinitionBuilder responseBuilder = WireMock.aResponse()
+            .withStatus(200)
+            .withHeader("Content-Type", "text/xml; charset=UTF-8")
+            .withBody(responseBody);
+
+        if (mapping.getDelays() != null) {
+            long delayMs = calculateDelayMs(mapping.getDelays());
+            if (delayMs > 0) {
+                responseBuilder = responseBuilder.withFixedDelay((int) delayMs);
+            }
+        }
+
+        StubMapping stubMapping = wireMockServer.stubFor(requestBuilder.willReturn(responseBuilder));
+        stubMapping.setPriority(mapping.getPriority());
+
+        if (mapping.getId() != null) {
+            try {
+                stubMapping.setId(UUID.fromString(mapping.getId()));
+            } catch (IllegalArgumentException e) {
+                String uuidString = convertObjectIdToUuid(mapping.getId());
+                stubMapping.setId(UUID.fromString(uuidString));
+            }
+        }
+
+        logger.debug("Created SOAP stub mapping: {} -> {}", mapping.getName(), soapPath);
     }
 
     private void addGraphQLBodyPatterns(MappingBuilder builder, com.simulator.model.GraphQLSpec spec) {
